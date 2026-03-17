@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Painel Administrativo - My-Delivery</title>
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="logo/icone-192.png">
+    <meta name="theme-color" content="#e63946">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="My Delivery">
+    <link rel="apple-touch-icon" href="logo/icone-192.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        const sessaoAdmin = JSON.parse(localStorage.getItem('usuarioLogado'));
+        if (!sessaoAdmin) { window.location.href = 'login.html'; }
+    </script>
+    
+    <style>
+        :root { --primary: #e63946; }
+        * { outline: none; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .animate-pop { animation: pop 0.25s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
+        @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+
+<body class="pb-32 text-slate-800 select-none">
+
+    <input type="file" id="input-file-backup" class="hidden" accept=".json" onchange="window.processarBackup(event)">
+
+    <div id="modal-alerta" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm items-center justify-center p-4 transition-all opacity-0" style="z-index: 99999;">
+        <div id="modal-alerta-box" class="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col items-center text-center transform scale-95 transition-all border border-slate-100">
+            <div id="alerta-icone" class="w-20 h-20 rounded-full flex items-center justify-center mb-6 text-4xl shadow-inner border border-slate-50"></div>
+            <h3 id="alerta-titulo" class="text-xl font-black text-slate-800 uppercase tracking-tighter mb-2 italic leading-none"></h3>
+            <p id="alerta-texto" class="text-sm font-bold text-slate-500 mb-8 leading-relaxed"></p>
+            <div id="alerta-botoes" class="w-full flex flex-col gap-3"></div>
+        </div>
+    </div>
+
+    <div id="modal-confirmacao" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm items-center justify-center p-4 transition-all opacity-0" style="z-index: 99998;">
+        <div id="modal-confirmacao-box" class="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col items-center text-center transform scale-95 transition-all border border-slate-100">
+            <div class="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mb-6 text-4xl shadow-inner border border-orange-100">⚠️</div>
+            <h3 id="confirm-titulo" class="text-xl font-black text-slate-800 uppercase tracking-tighter mb-2 italic leading-none"></h3>
+            <p id="confirm-texto" class="text-sm font-bold text-slate-500 mb-8 leading-relaxed"></p>
+            <div class="w-full flex gap-3">
+                <button id="btn-confirm-nao" class="flex-1 bg-slate-100 text-slate-600 py-4 rounded-xl font-black uppercase text-xs active:bg-slate-200 transition-colors">Cancelar</button>
+                <button id="btn-confirm-sim" class="flex-1 bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-red-200 active:scale-95 transition-all">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-cropper" class="hidden fixed inset-0 bg-slate-900/95 backdrop-blur-sm flex-col items-center justify-center p-4 transition-all opacity-0" style="z-index: 99999;">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl flex flex-col">
+            <h3 class="text-lg font-black text-slate-800 uppercase tracking-tighter mb-4 italic text-center">Ajustar Imagem</h3>
+            
+            <div class="w-full h-64 bg-slate-200 rounded-2xl overflow-hidden mb-6 relative">
+                <img id="image-to-crop" src="" class="block max-w-full">
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="window.fecharModalCropper()" class="flex-1 bg-slate-100 text-slate-600 py-4 rounded-xl font-black uppercase text-xs active:bg-slate-200 transition-colors">Cancelar</button>
+                <button onclick="window.cortarESalvarBanner()" class="flex-1 bg-purple-500 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-purple-200 active:scale-95 transition-all">Cortar e Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-[#e63946] fixed top-0 w-full z-40 px-6 py-4 shadow-xl flex justify-between items-center h-20 rounded-b-[2.5rem]">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-primary text-xl shadow-lg border-2 border-red-200 overflow-hidden">
+                <img src="https://ui-avatars.com/api/?name=Admin&background=random" class="w-full h-full object-cover">
+            </div>
+            <div>
+                <h1 class="text-white font-black italic text-xs uppercase leading-none tracking-widest drop-shadow-md">ADMINISTRAÇÃO</h1>
+                <p id="header-usuario" class="text-red-100 font-bold text-[9px] uppercase tracking-wider mt-0.5">CARREGANDO...</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <label class="flex flex-col items-center cursor-pointer bg-red-800/40 px-3 py-1.5 rounded-xl border border-red-900/30 active:scale-95 transition-transform">
+                <span id="txt-status-loja" class="text-[8px] font-black text-white uppercase tracking-widest mb-1">Aguarde</span>
+                <div class="relative w-8 h-4 bg-slate-400 rounded-full transition-colors" id="bg-toggle-loja">
+                    <div class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm" id="bolinha-toggle-loja"></div>
+                </div>
+                <input type="checkbox" id="chk-loja" class="hidden" onchange="window.toggleLoja()">
+            </label>
+            <button onclick="window.fazerLogout()" class="text-white bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center active:bg-white active:text-primary transition-all hover:bg-white/30">
+                <i class="ph-bold ph-sign-out text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="pt-28 px-6 max-w-4xl mx-auto relative">
+        
+        <div id="admin-menu-principal" class="grid grid-cols-2 md:grid-cols-4 gap-4 fade-in">
+            <button onclick="window.abrirSubSecao('produtos')" class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-all hover:border-red-200 group">
+                <div class="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-3xl mb-1 group-hover:scale-110 transition-transform">📦</div>
+                <span class="text-[10px] font-black uppercase text-slate-600 tracking-widest">Cardápio</span>
+            </button>
+            <button onclick="window.abrirSubSecao('relatorios')" class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-all hover:border-blue-200 group">
+                <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-3xl mb-1 group-hover:scale-110 transition-transform">📊</div>
+                <span class="text-[10px] font-black uppercase text-slate-600 tracking-widest">Relatórios</span>
+            </button>
+            <button onclick="window.abrirSubSecao('configuracoes')" class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-all hover:border-emerald-200 group">
+                <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-3xl mb-1 group-hover:scale-110 transition-transform">⚙️</div>
+                <span class="text-[10px] font-black uppercase text-slate-600 tracking-widest">Sistema</span>
+            </button>
+            <button onclick="window.abrirSubSecao('estorno')" class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-all hover:border-orange-200 group">
+                <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl mb-1 group-hover:scale-110 transition-transform">💸</div>
+                <span class="text-[10px] font-black uppercase text-slate-600 tracking-widest">Estornos</span>
+            </button>
+        </div>
+
+        <div id="secao-produtos" class="hidden space-y-4 fade-in">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-lg font-black text-slate-700 italic uppercase">Gestão de Cardápio</h2>
+                <button onclick="window.voltarAoMenuAdmin()" class="bg-slate-100 text-slate-400 w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">✕</button>
+            </div>
+            <div class="flex bg-white p-1.5 rounded-[1.5rem] shadow-sm border border-slate-100 mb-4">
+                <button onclick="window.alternarAbas('lista')" id="btn-aba-lista" class="flex-1 py-3 rounded-[1.2rem] bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest shadow-md transition-all">Lista</button>
+                <button onclick="window.alternarAbas('cadastro')" id="btn-aba-cadastro" class="flex-1 py-3 text-slate-400 text-[9px] font-black uppercase tracking-widest hover:text-slate-600 transition-all">Novo +</button>
+            </div>
+            <div id="aba-lista" class="pb-20"><div id="lista-catalogo" class="space-y-3"></div></div>
+            
+            <div id="aba-cadastro" class="hidden bg-white p-6 rounded-[2.5rem] shadow-lg border border-slate-100 space-y-5 pb-8">
+                <input type="hidden" id="edit-id">
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-2">Nome do Item</label>
+                    <input type="text" id="p-nome" class="w-full bg-slate-50 p-4 rounded-xl text-xs font-bold border border-slate-200 uppercase outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-2">Categoria</label>
+                        <select id="p-categoria" class="w-full bg-slate-50 p-4 rounded-xl text-xs font-bold border border-slate-200">
+                            <option value="Lanches">🍔 LANCHES</option>
+                            <option value="Bebidas">🥤 BEBIDAS</option>
+                            <option value="Sobremesas">🍩 SOBREMESAS</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-2">Preço (R$)</label>
+                        <input type="tel" id="p-preco" oninput="window.mascaraMoeda(event)" class="w-full bg-slate-50 p-4 rounded-xl text-xs font-bold border border-slate-200 text-center outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1.5 ml-2">Descrição</label>
+                    <textarea id="p-desc" rows="2" class="w-full bg-slate-50 p-4 rounded-xl text-xs font-bold border border-slate-200 outline-none"></textarea>
+                </div>
+                <div class="bg-blue-50 p-5 rounded-[1.5rem] border border-blue-100"><label class="block text-[9px] font-black text-blue-600 uppercase mb-3">Sabores</label><div id="select-sabores" class="flex flex-wrap gap-2"></div></div>
+                <div class="bg-orange-50 p-5 rounded-[1.5rem] border border-orange-100"><label class="block text-[9px] font-black text-orange-500 uppercase mb-3">Ingredientes Retiráveis</label><div id="select-ingredientes" class="flex flex-wrap gap-2"></div></div>
+                <div class="bg-emerald-50 p-5 rounded-[1.5rem] border border-emerald-100"><label class="block text-[9px] font-black text-emerald-600 uppercase mb-3">Adicionais</label><div id="select-adicionais" class="flex flex-wrap gap-2"></div></div>
+                
+                <div class="col-span-full mt-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Imagens (Capa e Galeria)</label>
+                        <label for="upload-imagens-prod" class="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase cursor-pointer hover:bg-blue-600 transition-colors shadow-sm">
+                            + Fotos
+                        </label>
+                        <input type="file" id="upload-imagens-prod" multiple accept="image/*" class="hidden" onchange="window.uploadImagensProduto(event)">
+                    </div>
+                    <div id="preview-imagens-prod" class="flex gap-3 overflow-x-auto custom-scroll pb-2 mt-3 min-h-[5rem]">
+                        <p class="text-[10px] text-slate-400 italic font-bold w-full text-center mt-4">Nenhuma imagem adicionada.</p>
+                    </div>
+                </div>
+                
+                <button onclick="window.salvarProduto()" id="btn-salvar-prod" class="w-full bg-emerald-500 text-white py-5 rounded-2xl text-xs font-black uppercase shadow-xl active:scale-95 transition-all italic hover:bg-emerald-600 mt-4">Salvar Produto</button>
+            </div>
+        </div>
+
+        <div id="secao-relatorios" class="hidden animate-pop pb-20">
+            <div class="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+                <button onclick="window.voltarAoMenuAdmin()" class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-primary transition-all active:scale-95">
+                    <i class="ph-bold ph-arrow-left text-xl"></i>
+                </button>
+                <div class="flex flex-wrap gap-2 justify-center">
+                    <button onclick="window.imprimirRelatorio()" class="bg-emerald-500 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 active:scale-95 transition-all flex items-center gap-2">
+                        <i class="ph-bold ph-printer text-lg"></i> Imprimir
+                    </button>
+                    <button onclick="document.getElementById('input-file-backup').click()" class="bg-blue-500 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center gap-2">
+                        <i class="ph-bold ph-upload-simple text-lg"></i> Importar
+                    </button>
+                    <button onclick="window.fazerBackup()" class="bg-slate-800 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 active:scale-95 transition-all flex items-center gap-2">
+                        <i class="ph-bold ph-cloud-arrow-down text-lg"></i> Backup
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
+                    <div class="w-14 h-14 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center mb-4 text-2xl border border-orange-100"><i class="ph-fill ph-timer"></i></div>
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Tempo Médio</p>
+                    <h3 id="txt-tempo-medio" class="text-4xl font-black text-slate-800 italic tracking-tighter">-- min</h3>
+                </div>
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
+                    <div class="w-14 h-14 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mb-4 text-2xl border border-blue-100"><i class="ph-fill ph-shopping-bag"></i></div>
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pedidos Entregues</p>
+                    <h3 id="txt-total-pedidos" class="text-4xl font-black text-slate-800 italic tracking-tighter">--</h3>
+                    <p id="txt-faturamento-total" class="text-[10px] font-black text-emerald-500 uppercase mt-2 italic">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center text-xl border border-red-100"><i class="ph-fill ph-crown"></i></div>
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mais Vendidos</p>
+                    </div>
+                    <div id="container-ranking" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8 h-80">
+                <canvas id="chart-semana"></canvas>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                    <p class="text-[10px] font-black text-slate-400 uppercase mb-8 tracking-widest">Filtro por Período</p>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <input type="date" id="data-inicio-rel" class="bg-slate-50 p-4 rounded-2xl text-xs font-black">
+                        <input type="date" id="data-fim-rel" class="bg-slate-50 p-4 rounded-2xl text-xs font-black">
+                    </div>
+                    <button onclick="window.gerarRelatorioFinanceiro()" class="w-full bg-emerald-500 text-white py-5 rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-emerald-100 active:scale-95 transition-all">Consultar</button>
+                    <div id="conteudo-rel-financeiro" class="mt-6"></div>
+                </div>
+                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                    <p class="text-[10px] font-black text-slate-400 uppercase mb-8 tracking-widest">Histórico Recente</p>
+                    <div id="lista-vendas-estorno" class="space-y-3 max-h-[420px] overflow-y-auto pr-3 custom-scroll"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="secao-configuracoes" class="hidden space-y-6 fade-in pb-20">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-black text-slate-700 italic uppercase">Sistema</h2>
+                <button onclick="window.voltarAoMenuAdmin()" class="bg-slate-100 text-slate-400 w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">✕</button>
+            </div>
+
+            <div id="menu-config-cards" class="space-y-3">
+                <button onclick="window.abrirConfigEspecifica('loja')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-all group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center text-purple-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-storefront"></i></div>
+                        <span class="text-xs font-black text-slate-700 uppercase tracking-widest">Aparência da Loja</span>
+                    </div>
+                    <i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <button onclick="window.abrirConfigEspecifica('ticket')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-all group">
+                    <div class="flex items-center gap-4"><div class="w-12 h-12 bg-yellow-50 rounded-full flex items-center justify-center text-yellow-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-ticket"></i></div><span class="text-xs font-black text-slate-700 uppercase tracking-widest">Configurar Ticket</span></div><i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <button onclick="window.abrirConfigEspecifica('usuarios')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-all group">
+                    <div class="flex items-center gap-4"><div class="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-green-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-users-three"></i></div><span class="text-xs font-black text-slate-700 uppercase tracking-widest">Gerir Colaboradores</span></div><i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <button onclick="window.abrirConfigEspecifica('auditoria')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-all group">
+                    <div class="flex items-center gap-4"><div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-clipboard-text"></i></div><span class="text-xs font-black text-slate-700 uppercase tracking-widest">Auditoria (Logs)</span></div><i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <button onclick="window.abrirConfigEspecifica('taxas')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-all group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center text-teal-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-moped"></i></div>
+                        <span class="text-xs font-black text-slate-700 uppercase tracking-widest">Taxas de Entrega</span>
+                    </div>
+                    <i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <button onclick="window.abrirConfigEspecifica('clientes')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-all group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-users-three"></i></div>
+                        <span class="text-xs font-black text-slate-700 uppercase tracking-widest">Meus Clientes</span>
+                    </div>
+                    <i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <button onclick="window.abrirConfigEspecifica('sabores')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm flex items-center justify-between active:scale-95 transition-all border border-slate-100 group">
+                    <div class="flex items-center gap-4"><div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-ice-cream"></i></div><span class="text-xs font-black text-slate-700 uppercase tracking-widest">Sabores</span></div><i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <button onclick="window.abrirConfigEspecifica('insumos')" class="w-full bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-all group">
+                    <div class="flex items-center gap-4"><div class="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center text-orange-500 text-2xl group-hover:scale-110 transition-transform"><i class="ph-fill ph-carrot"></i></div><span class="text-xs font-black text-slate-700 uppercase tracking-widest">Insumos/Extras</span></div><i class="ph-bold ph-caret-right text-slate-300"></i>
+                </button>
+
+                <div class="grid grid-cols-2 gap-3 pt-4">
+                    <button onclick="document.getElementById('input-file-backup').click()" class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-all hover:bg-slate-50">
+                        <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 text-xl"><i class="ph-fill ph-upload-simple"></i></div>
+                        <span class="text-[9px] font-black uppercase text-slate-600">Importar</span>
+                    </button>
+                    <button onclick="window.fazerBackup()" class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center gap-2 active:scale-95 transition-all hover:bg-slate-50">
+                        <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 text-xl"><i class="ph-fill ph-floppy-disk"></i></div>
+                        <span class="text-[9px] font-black uppercase text-slate-600">Exportar</span>
+                    </button>
+                </div>
+            </div>
+            <div id="view-cfg-loja" class="hidden space-y-6">
+                <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
+                
+                <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <h3 class="text-sm font-black text-slate-700 uppercase mb-4 tracking-widest">Banner de Destaque</h3>
+                    <p class="text-[10px] text-slate-400 font-bold mb-4">Esta imagem aparecerá no topo do telemóvel do cliente.</p>
+                    
+                    <div id="preview-banner-loja" class="w-full h-40 bg-slate-100 rounded-2xl mb-4 overflow-hidden relative border-2 border-dashed border-slate-300 flex items-center justify-center">
+                        <i class="ph-bold ph-image text-4xl text-slate-300"></i>
+                    </div>
+                    
+                    <input type="file" id="upload-banner" accept="image/*" class="hidden" onchange="window.uploadBannerLoja(event)">
+                    <label for="upload-banner" class="w-full bg-purple-500 text-white py-4 rounded-xl font-black uppercase text-xs cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:bg-purple-600 transition-colors">
+                        <i class="ph-bold ph-upload-simple text-lg"></i> Enviar Novo Banner
+                    </label>
+                </div>
+            </div>
+
+            <div id="view-cfg-ticket" class="hidden bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase mb-6 flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
+                <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Tamanho Bobina</label>
+                <select id="ticket-width" class="w-full p-4 bg-slate-50 rounded-2xl text-xs font-bold mb-4 border border-slate-100 outline-none"><option value="58mm">58mm</option><option value="80mm">80mm</option></select>
+                <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-2">Mensagem Rodapé</label>
+                <input type="text" id="ticket-footer" class="w-full p-4 bg-slate-50 rounded-2xl text-xs font-bold mb-6 border border-slate-100 outline-none">
+                <button onclick="window.salvarConfigTicket()" class="w-full bg-yellow-400 text-white py-4 rounded-2xl font-black uppercase shadow-xl active:scale-95 transition-all">Salvar</button>
+            </div>
+
+            <div id="view-cfg-usuarios" class="hidden space-y-4">
+                <div class="flex items-center justify-between mb-2">
+                    <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
+                    <button onclick="window.limparCamposUsuario()" class="bg-blue-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all">Novo +</button>
+                </div>
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
+                    <h4 id="titulo-form-usuario" class="text-[10px] font-black text-slate-400 uppercase mb-4 ml-2 tracking-widest">Cadastrar Colaborador</h4>
+                    <input type="hidden" id="edit-user-id">
+                    <input type="text" id="novo-user-login" placeholder="LOGIN" class="w-full p-4 bg-slate-50 rounded-xl text-xs font-bold mb-3 uppercase border-none outline-none focus:ring-2 focus:ring-blue-100">
+                    <input type="password" id="novo-user-senha" placeholder="SENHA" class="w-full p-4 bg-slate-50 rounded-xl text-xs font-bold mb-3 border-none outline-none focus:ring-2 focus:ring-blue-100">
+                    <select id="novo-user-role" class="w-full p-4 bg-slate-50 rounded-xl text-xs font-bold mb-4 border-none outline-none"><option value="funcionario">Funcionário (Cozinha)</option><option value="admin">Administrador (Geral)</option></select>
+                    <button onclick="window.salvarUsuario()" id="btn-salvar-usuario" class="w-full bg-green-500 text-white py-4 rounded-xl font-black uppercase shadow-lg shadow-green-100 active:scale-95 transition-all">Registrar Acesso</button>
+                </div>
+                <div id="lista-usuarios-sistema" class="space-y-3"></div>
+            </div>
+
+            <div id="view-cfg-auditoria" class="hidden space-y-4">
+                <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase mb-2 flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
+                    <p class="text-[10px] font-black text-slate-400 uppercase mb-4 ml-2 italic">Registro de Atividades</p>
+                    <div class="overflow-hidden"><table class="w-full text-left"><tbody id="lista-auditoria" class="divide-y divide-slate-50"></tbody></table></div>
+                </div>
+            </div>
+
+            <div id="view-cfg-sabores" class="hidden bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase mb-6 flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
+                <input type="hidden" id="edit-sab-id">
+                <div class="flex gap-2 mb-6 bg-blue-50/50 p-2 rounded-2xl border border-blue-100">
+                    <input type="text" id="new-sab-name" placeholder="EX: COCA-COLA LATA" class="flex-1 bg-transparent p-3 text-xs font-bold uppercase outline-none text-blue-800">
+                    <button onclick="window.salvarInsumo('sab')" id="btn-salvar-sab" class="bg-blue-500 text-white w-12 h-12 rounded-xl font-black text-2xl">+</button>
+                </div>
+                <div id="lista-sab-sistema" class="space-y-2 max-h-80 overflow-y-auto custom-scroll pr-2"></div>
+            </div>
+
+            <div id="view-cfg-taxas" class="hidden space-y-6">
+                <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
+                <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <input type="hidden" id="edit-taxa-id">
+                    <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2">Cidades e Valores</p>
+                    <div class="flex gap-2 mb-6 bg-teal-50/50 p-2 rounded-2xl border border-teal-100">
+                        <input type="text" id="new-taxa-cidade" placeholder="NOME DA CIDADE" class="flex-1 bg-transparent p-3 text-xs font-bold uppercase outline-none text-teal-800">
+                        <input type="tel" id="new-taxa-valor" oninput="window.mascaraMoeda(event)" placeholder="R$" class="w-20 bg-transparent p-3 text-xs font-bold text-center border-l border-teal-200 outline-none">
+                        <button onclick="window.salvarTaxa()" id="btn-salvar-taxa" class="bg-teal-500 text-white w-12 h-12 rounded-xl font-black text-xl">+</button>
+                    </div>
+                    <div id="lista-taxas-sistema" class="space-y-2 max-h-60 overflow-y-auto custom-scroll pr-2"></div>
+                </div>
+            </div>
+
+            <div id="view-cfg-clientes" class="hidden space-y-6">
+                <div class="flex justify-between items-center">
+                    <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2 hover:text-slate-600 transition-colors"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
+                    <span class="bg-blue-100 text-blue-600 text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-widest" id="total-clientes-badge">0 Clientes</span>
+                </div>
+                
+                <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <div class="relative mb-6">
+                        <i class="ph-bold ph-magnifying-glass absolute left-4 top-4 text-slate-300"></i>
+                        <input type="text" id="busca-cliente" oninput="window.filtrarClientesLista()" placeholder="Buscar por nome ou telefone..." class="w-full bg-slate-50 p-4 pl-12 rounded-2xl text-xs font-bold text-slate-600 border border-slate-100 focus:border-blue-200 transition-all outline-none">
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b-2 border-slate-100">
+                                    <th class="pb-3 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[120px]">Nome do Cliente</th>
+                                    <th class="pb-3 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[120px]">Contato</th>
+                                    <th class="pb-3 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Endereço Principal</th>
+                                    <th class="pb-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center min-w-[80px]">Cadastro</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-clientes-tabela" class="text-xs font-bold text-slate-600">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+<div id="view-cfg-insumos" class="hidden space-y-6">
+    <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2 hover:text-slate-600 transition-all">
+        <i class="ph-bold ph-arrow-left"></i> Voltar
+    </button>
+
+    <div class="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm">
+        <input type="hidden" id="edit-ing-id">
+        <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2 italic tracking-widest">Itens Retiráveis (Ex: Sem Cebola)</p>
+        
+        <div class="flex items-center gap-2 mb-6 bg-orange-50/50 p-1.5 rounded-2xl border border-orange-100 w-full">
+            <input type="text" id="new-ing-name" placeholder="NOME DO ITEM" 
+                   class="flex-1 min-w-0 bg-transparent p-3 text-[11px] font-bold uppercase outline-none text-orange-800 placeholder-orange-200">
+            
+            <button onclick="window.salvarInsumo('ing')" id="btn-salvar-ing" 
+                    class="bg-orange-500 text-white w-10 h-10 rounded-xl font-black text-xl flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-orange-100 shrink-0">
+                +
+            </button>
+        </div>
+        
+        <div id="lista-ing-sistema" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm">
+        <input type="hidden" id="edit-add-id">
+        <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2 italic tracking-widest">Adicionais Pagos (Extras)</p>
+        
+        <div class="flex items-center gap-2 mb-6 bg-emerald-50/50 p-1.5 rounded-2xl border border-emerald-100 w-full">
+            <input type="text" id="new-add-name" placeholder="NOME" 
+                   class="flex-1 min-w-0 bg-transparent p-3 text-[11px] font-bold uppercase outline-none text-emerald-800 placeholder-emerald-200">
+            
+            <input type="tel" id="new-add-price" oninput="window.mascaraMoeda(event)" placeholder="R$" 
+                   class="w-16 bg-transparent p-3 text-[11px] font-bold text-center border-l border-emerald-200 outline-none text-emerald-800 placeholder-emerald-200 shrink-0">
+            
+            <button onclick="window.salvarInsumo('add')" id="btn-salvar-add" 
+                    class="bg-emerald-500 text-white w-10 h-10 rounded-xl font-black text-xl flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-emerald-100 shrink-0">
+                +
+            </button>
+        </div>
+        
+        <div id="lista-add-sistema" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></div>
+    </div>
+</div>
+            
+        </div>
+
+        <div id="secao-estorno" class="hidden space-y-4 fade-in pb-20">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-black text-slate-700 italic uppercase">Histórico para Estorno</h2>
+                <button onclick="window.voltarAoMenuAdmin()" class="bg-slate-100 text-slate-400 w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">✕</button>
+            </div>
+            <div id="lista-vendas-estorno-principal" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <nav class="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md p-4 pb-8 rounded-t-[2.5rem] shadow-[0_-5px_30px_rgba(0,0,0,0.06)] border-t border-slate-100 z-50">
+        <div class="flex justify-around items-center max-w-lg mx-auto">
+            <a href="index.html" class="flex flex-col items-center gap-1 text-slate-300 active:scale-90 transition-transform"><i class="ph-fill ph-house text-2xl"></i><span class="text-[9px] font-black uppercase tracking-widest">Loja</span></a>
+            <a href="cliente.html" class="flex flex-col items-center gap-1 text-slate-300 active:scale-90 transition-transform"><i class="ph-fill ph-book-open text-2xl"></i><span class="text-[9px] font-black uppercase tracking-widest">Acompanhar</span></a>
+            <button onclick="window.open('cozinha.html', '_blank')" class="flex flex-col items-center gap-1 text-slate-300 active:scale-90 transition-transform"><i class="ph-fill ph-chef-hat text-2xl"></i><span class="text-[9px] font-black uppercase tracking-widest">Cozinha</span></button>
+            <button onclick="window.voltarAoMenuAdmin()" class="flex flex-col items-center gap-1 text-primary active:scale-90 transition-transform"><i class="ph-fill ph-gear text-2xl"></i><span class="text-[9px] font-black uppercase italic tracking-widest">Painel</span></button>
+        </div>
+    </nav>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/painel.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(reg => console.log('PWA Pronto.')).catch(err => console.log('Erro PWA:', err));
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pedidos - My-Delivery</title>
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="logo/icone-192.png">
+    <meta name="theme-color" content="#e63946">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="My Delivery">
+    <link rel="apple-touch-icon" href="logo/icone-192.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // Trava de segurança
+        const sessaoCozinha = JSON.parse(localStorage.getItem('usuarioLogado'));
+        if (!sessaoCozinha) { window.location.href = 'login.html'; } // Redireciona para o login correto
+
+        // Configuração do Tailwind para suportar Dark Mode por classe
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { primary: '#e63946' } } }
+        }
+
+        // Verifica a preferência salva antes de carregar a página (evita piscar)
+        if (localStorage.getItem('temaCozinha') === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+
+    <style>
+        * { outline: none; -webkit-tap-highlight-color: transparent; }
+        body { font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
+        
+        .card-pedido { animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+        
+        .status-pendente { border-left: 8px solid #ef4444; } 
+        .status-preparo { border-left: 8px solid #f97316; }  
+        .status-rota { border-left: 8px solid #3b82f6; }     
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+
+        /* FORÇA BRUTA PARA OS MODAIS DE ALERTA */
+        #modal-alerta { z-index: 99999 !important; }
+        #modal-confirmacao { z-index: 99998 !important; }
+    </style>
+</head>
+<body class="p-6 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300 select-none">
+
+    <div id="modal-alerta" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm items-center justify-center p-4 transition-all opacity-0">
+        <div id="modal-alerta-box" class="bg-white dark:bg-slate-800 w-full max-w-sm rounded-[2rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col items-center text-center transform scale-95 transition-all border border-slate-100 dark:border-slate-700">
+            <div id="alerta-icone" class="w-20 h-20 rounded-full flex items-center justify-center mb-6 text-4xl shadow-inner border border-slate-50 dark:border-slate-700"></div>
+            <h3 id="alerta-titulo" class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter mb-2 italic leading-none"></h3>
+            <p id="alerta-texto" class="text-sm font-bold text-slate-500 dark:text-slate-400 mb-8 leading-relaxed"></p>
+            <div id="alerta-botoes" class="w-full flex flex-col gap-3"></div>
+        </div>
+    </div>
+
+    <div id="modal-confirmacao" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm items-center justify-center p-4 transition-all opacity-0">
+        <div id="modal-confirmacao-box" class="bg-white dark:bg-slate-800 w-full max-w-sm rounded-[2rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col items-center text-center transform scale-95 transition-all border border-slate-100 dark:border-slate-700">
+            <div class="w-20 h-20 bg-orange-50 dark:bg-orange-500/20 text-orange-500 rounded-full flex items-center justify-center mb-6 text-4xl shadow-inner border border-orange-200 dark:border-orange-500/50">⚠️</div>
+            <h3 id="confirm-titulo" class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter mb-2 italic leading-none"></h3>
+            <p id="confirm-texto" class="text-sm font-bold text-slate-500 dark:text-slate-400 mb-8 leading-relaxed"></p>
+            <div class="w-full flex gap-3">
+                <button id="btn-confirm-nao" class="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 py-4 rounded-xl font-black uppercase text-xs active:bg-slate-200 dark:active:bg-slate-600 transition-colors">Não</button>
+                <button id="btn-confirm-sim" class="flex-1 bg-red-600 dark:bg-red-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-red-200 dark:shadow-red-900/50 active:scale-95 transition-all">Sim</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="flex flex-col md:flex-row justify-between items-center mb-8 bg-white/80 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-xl backdrop-blur-sm sticky top-4 z-40 transition-colors duration-300">
+        <div class="flex items-center gap-4 mb-4 md:mb-0">
+            <div class="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-200 dark:shadow-red-900/40">
+                <i class="ph-fill ph-chef-hat text-4xl"></i>
+            </div>
+            <div>
+                <h1 class="text-slate-800 dark:text-white font-black text-2xl uppercase italic tracking-tighter leading-none transition-colors">Pedidos</h1>
+                <p class="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1 flex items-center gap-2">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Sistema Online
+                </p>
+            </div>
+        </div>
+        
+        <div class="flex flex-wrap items-center justify-center md:justify-end gap-3">
+            <button onclick="window.toggleTema()" id="btn-tema" class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-white px-4 py-3 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase active:scale-95 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all border border-slate-200 dark:border-slate-600 h-16 shadow-sm">
+                <i class="ph-bold text-xl" id="icone-tema"></i> 
+                <span id="texto-tema" class="w-16 text-left leading-tight">Modo</span>
+            </button>
+
+            <button onclick="window.habilitarSom()" id="btn-som" class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-white px-4 py-3 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase active:scale-95 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all border border-slate-200 dark:border-slate-600 h-16 shadow-sm">
+                <i class="ph-bold ph-speaker-slash text-xl" id="icone-som"></i> 
+                <span id="texto-som" class="w-16 text-left leading-tight">Ligar<br>Som</span>
+            </button>
+
+            <div class="bg-slate-100 dark:bg-slate-700 px-4 py-3 rounded-2xl flex items-center gap-3 border border-slate-200 dark:border-slate-600 h-16 shadow-sm">
+                <span class="text-[9px] font-black text-slate-600 dark:text-white uppercase tracking-widest leading-tight text-right">Auto<br>Refresh</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggle-auto-refresh" class="sr-only peer" onchange="window.toggleAutoRefresh()">
+                    <div class="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+            </div>
+
+            <div class="bg-slate-50 dark:bg-slate-900 px-6 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 text-center shadow-inner h-16 flex flex-col justify-center min-w-[100px] transition-colors">
+                <p class="text-slate-400 dark:text-slate-500 text-[8px] font-black uppercase tracking-widest leading-none mb-1">Pendentes</p>
+                <span id="contador-pedidos" class="text-slate-800 dark:text-white font-black text-2xl leading-none transition-colors">0</span>
+            </div>
+            
+            <button onclick="window.fazerLogout()" class="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-white w-16 h-16 rounded-2xl flex items-center justify-center active:scale-95 transition-all hover:text-red-500 hover:border-red-200 dark:hover:bg-red-500 dark:hover:shadow-red-900/50 border border-slate-200 dark:border-slate-600 shadow-sm">
+                <i class="ph-bold ph-sign-out text-2xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <main id="monitor-pedidos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+        <div class="col-span-full text-center py-20 opacity-50">
+            <i class="ph-bold ph-spinner animate-spin text-4xl mb-4 text-slate-400 dark:text-slate-500"></i>
+            <p class="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-slate-500">Conectando ao sistema...</p>
+        </div>
+    </main>
+
+    <audio id="som-notificacao" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <div id="modal-previa-pedido" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl animate-pop border border-slate-100 dark:border-slate-700">
+            
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black text-slate-800 dark:text-white italic uppercase" id="previa-id">PEDIDO #00</h3>
+                <button onclick="window.fecharPrevia()" class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                    <i class="ph-bold ph-x text-2xl"></i>
+                </button>
+            </div>
+            
+            <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl mb-4 border border-slate-100 dark:border-slate-700">
+                <p class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase">Cliente</p>
+                <p class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase" id="previa-cliente-nome">NOME DO CLIENTE</p>
+                
+                <p class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase mt-3">Endereço de Entrega</p>
+                <p class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase leading-snug" id="previa-endereco">ENDEREÇO COMPLETO</p>
+            </div>
+
+            <div id="previa-lista-itens" class="space-y-4 max-h-[35vh] overflow-y-auto pr-2 custom-scrollbar mb-6">
+                </div>
+
+            <div class="bg-slate-50 dark:bg-slate-900 p-5 rounded-3xl mb-8 space-y-2 border border-slate-100 dark:border-slate-700">
+                <div class="flex justify-between text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">
+                    <span>Produtos:</span>
+                    <span id="previa-subtotal">R$ 0,00</span>
+                </div>
+                <div class="flex justify-between text-[10px] font-black uppercase text-emerald-500 dark:text-emerald-400">
+                    <span>Taxa de Entrega:</span>
+                    <span id="previa-taxa">R$ 0,00</span>
+                </div>
+                <div class="flex justify-between text-lg font-black uppercase text-slate-800 dark:text-white pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <span>Total:</span>
+                    <span id="previa-total">R$ 0,00</span>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="window.fecharPrevia()" class="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 py-4 rounded-2xl font-black uppercase text-[10px] active:scale-95 transition-transform hover:bg-slate-200 dark:hover:bg-slate-600">Voltar</button>
+                <button id="btn-confirmar-preparo" class="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30 active:scale-95 transition-all">Aceitar Pedido</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/cozinha.js"></script>
+    <script>
+        // Registro do Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registrado com sucesso.'))
+                    .catch(err => console.log('Falha ao registrar o Service Worker:', err));
+            });
+        }
+    </script>
+</body>
+</html>
