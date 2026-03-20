@@ -1016,15 +1016,20 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
 
     if (!pedido) return alert("Erro: Pedido não encontrado para impressão.");
 
-    // BUSCA OS DADOS DA LOJA DIRETAMENTE DO BANCO ANTES DE IMPRIMIR E FORMATA
+    // --- FUNÇÃO AUXILIAR PARA CORRIGIR ACENTOS ---
+    const limparTexto = (txt) => {
+        if (!txt) return '';
+        return txt.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    };
+
+    // BUSCA OS DADOS DA LOJA
     let nomeDaLoja = 'MY-DELIVERY';
     let telefoneDaLoja = '';
     try {
         const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
         if (cfg) {
-            if (cfg.nome_loja) nomeDaLoja = cfg.nome_loja.toUpperCase();
+            if (cfg.nome_loja) nomeDaLoja = limparTexto(cfg.nome_loja);
             if (cfg.telefone_loja) {
-                // Formata o telefone da loja
                 let tLoja = cfg.telefone_loja.replace(/\D/g, '');
                 if (tLoja.startsWith('55') && tLoja.length >= 12) tLoja = tLoja.slice(2);
                 if (tLoja.length === 11) telefoneDaLoja = `(${tLoja.slice(0,2)}) ${tLoja.slice(2,3)} ${tLoja.slice(3,7)}-${tLoja.slice(7)}`;
@@ -1035,38 +1040,38 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     } catch(e) { console.error("Aviso: Imprimindo com nome padrão."); }
 
     const config = JSON.parse(localStorage.getItem('ticketConfig')) || { width: '58mm', footer: 'Obrigado pela preferência!' };
-    const maxLargura = config.width === '80mm' ? '300px' : '220px';
+    const maxLargura = config.width === '80mm' ? '280px' : '210px'; // Ajuste fino para não cortar a lateral
     const fontSize = config.width === '80mm' ? '14px' : '12px';
 
-    let enderecoLimpo = (pedido.endereco || '-').split(' | ')[0];
-    let formaPgto = pedido.forma_pagamento || pedido.pagamento || '-';
+    let enderecoLimpo = limparTexto((pedido.endereco || '-').split(' | ')[0]);
+    let formaPgto = limparTexto(pedido.forma_pagamento || pedido.pagamento || '-');
+    let referencia = limparTexto(pedido.referencia || pedido.ponto_referencia || '-');
     
     // Formata o Telefone do Cliente
-    let telFormatado = pedido.cliente_tel || 'Não informado';
-    if (telFormatado !== 'Não informado') {
+    let telFormatado = pedido.cliente_tel || 'Nao informado';
+    if (telFormatado !== 'Nao informado') {
         let t = telFormatado.replace(/\D/g, '');
         if (t.startsWith('55') && t.length >= 12) t = t.slice(2);
         if (t.length === 11) telFormatado = `(${t.slice(0,2)}) ${t.slice(2,3)} ${t.slice(3,7)}-${t.slice(7)}`;
         else if (t.length === 10) telFormatado = `(${t.slice(0,2)}) ${t.slice(2,6)}-${t.slice(6)}`;
     }
 
-    const linhaTracejada = `<div class="linha-tracejada" style="border-bottom: 1px dashed #000; margin: 8px 0;"></div>`;
-    const linhaContinua = `<div class="linha-continua" style="border-bottom: 2px solid #000; margin-bottom: 8px;"></div>`;
+    const linhaTracejada = `<div style="border-bottom: 1px dashed #000; margin: 5px 0; width: 100%;"></div>`;
 
     const itensHtml = pedido.itens.map(i => {
         let extrasHTML = "";
-        if (i.sabor) extrasHTML += `<div>OBS: SABOR: ${i.sabor.toUpperCase()}</div>`;
-        if (i.adicionais && i.adicionais.length > 0) extrasHTML += `<div>OBS: ADD: ${i.adicionais.map(a=>a.nome).join(', ').toUpperCase()}</div>`;
-        if (i.removidos && i.removidos.length > 0) extrasHTML += `<div>OBS: SEM: ${i.removidos.join(', ').toUpperCase()}</div>`;
-        if (!extrasHTML && i.detalhes) extrasHTML += `<div>OBS: ${i.detalhes.toUpperCase()}</div>`;
+        if (i.sabor) extrasHTML += `<div>OBS: SABOR: ${limparTexto(i.sabor)}</div>`;
+        if (i.adicionais && i.adicionais.length > 0) extrasHTML += `<div>OBS: ADD: ${limparTexto(i.adicionais.map(a=>a.nome).join(', '))}</div>`;
+        if (i.removidos && i.removidos.length > 0) extrasHTML += `<div>OBS: SEM: ${limparTexto(i.removidos.join(', '))}</div>`;
+        if (!extrasHTML && i.detalhes) extrasHTML += `<div>OBS: ${limparTexto(i.detalhes)}</div>`;
 
         return `
-            <div style="margin-bottom: 8px;">
+            <div style="margin-bottom: 6px; width: 100%;">
                 <div style="display: flex; justify-content: space-between;">
-                    <span>${i.qtd}x ${i.nome.toUpperCase()}</span>
-                    <span>R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}</span>
+                    <span style="flex: 1;">${i.qtd}x ${limparTexto(i.nome)}</span>
+                    <span style="white-space: nowrap;">R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}</span>
                 </div>
-                ${extrasHTML}
+                <div style="font-size: 0.9em; margin-left: 5px;">${extrasHTML}</div>
             </div>
         `;
     }).join('');
@@ -1074,52 +1079,50 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     let taxaEntregaHtml = '';
     if (pedido.taxa_entrega && parseFloat(pedido.taxa_entrega) > 0) {
         taxaEntregaHtml = `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
                 <span>TAXA ENTREGA:</span>
                 <span>R$ ${parseFloat(pedido.taxa_entrega).toFixed(2).replace('.', ',')}</span>
             </div>
         `;
     }
 
-    // Prepara o bloco do telefone da loja (agora formatado!)
-    const htmlTelefoneLoja = telefoneDaLoja ? `<div style="text-align: center; font-size: 1.1em; margin-bottom: 4px;">TEL: ${telefoneDaLoja}</div>` : '';
+    const htmlTelefoneLoja = telefoneDaLoja ? `<div style="text-align: center; margin-bottom: 4px;">TEL: ${telefoneDaLoja}</div>` : '';
 
     const cupomHTML = `
-        <div style="width: ${maxLargura}; font-family: 'Courier New', Courier, monospace; font-size: ${fontSize}; color: #000; font-weight: bold; line-height: 1.5;">
+        <div style="width: ${maxLargura}; padding: 0 2mm; font-family: 'Courier New', Courier, monospace; font-size: ${fontSize}; color: #000; font-weight: bold; line-height: 1.3;">
             
-            <div style="text-align: center; font-size: 1.4em;">${nomeDaLoja}</div>
+            <div style="text-align: center; font-size: 1.3em;">${nomeDaLoja}</div>
             ${htmlTelefoneLoja}
-            <div style="text-align: center; font-size: 1.2em;">PEDIDO #${pedido.id.toString()}</div>
+            <div style="text-align: center; font-size: 1.1em;">PEDIDO #${pedido.id.toString()}</div>
             
             ${linhaTracejada}
             
             <div>HORA: ${new Date(pedido.created_at).toLocaleString('pt-BR')}</div>
-            <div>CLIENTE: ${pedido.cliente_nome ? pedido.cliente_nome.toUpperCase() : 'NÃO INFORMADO'}</div>
+            <div>CLIENTE: ${limparTexto(pedido.cliente_nome) || 'NAO INFORMADO'}</div>
             <div>TELEFONE: ${telFormatado}</div>
-            <div>ENDEREÇO: ${enderecoLimpo.toUpperCase()}</div>
-            <div>PAGAMENTO: ${formaPgto.toUpperCase()}</div>
-            <div>REFERÊNCIA: ${(pedido.referencia || pedido.ponto_referencia || '-').toUpperCase()}</div>
+            <div style="word-wrap: break-word;">ENDERECO: ${enderecoLimpo}</div>
+            <div>PAGAMENTO: ${formaPgto}</div>
+            <div style="word-wrap: break-word;">REFERENCIA: ${referencia}</div>
             
             ${linhaTracejada}
             
-            <div style="margin-bottom: 12px;">ITENS DO PEDIDO:</div>
+            <div style="margin-bottom: 8px;">ITENS DO PEDIDO:</div>
             
             ${itensHtml}
             
             ${linhaTracejada}
-            ${linhaContinua}
             
             ${taxaEntregaHtml}
             
-            <div style="display: flex; justify-content: space-between; font-size: 1.4em;">
+            <div style="display: flex; justify-content: space-between; font-size: 1.3em;">
                 <span>TOTAL:</span>
                 <span>R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}</span>
             </div>
             
             ${linhaTracejada}
             
-            <div style="text-align: center; margin-top: 15px;">
-                ${config.footer.toUpperCase()}
+            <div style="text-align: center; margin-top: 10px;">
+                ${limparTexto(config.footer)}
             </div>
         </div>
     `;
@@ -1127,11 +1130,12 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
+        // No Android, removemos as tags HTML para enviar texto puro para a RawBT
         let textoPuro = cupomHTML
-            .replace(/<div[^>]*class="linha-tracejada"[^>]*><\/div>/gi, '\n--------------------------------\n')
-            .replace(/<div[^>]*class="linha-continua"[^>]*><\/div>/gi, '\n________________________________\n')
+            .replace(/<div[^>]*style="[^"]*border-bottom:[^"]*"[^>]*><\/div>/gi, '\n--------------------------------\n')
             .replace(/<\/div>/gi, '\n')
-            .replace(/<br\s*[\/]?>/gi, '\n')
+            .replace(/<span[^>]*>/gi, '')
+            .replace(/<\/span>/gi, ' ')
             .replace(/<[^>]*>/g, '') 
             .replace(/\n\s*\n/g, '\n') 
             .trim();
@@ -1140,11 +1144,15 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
         window.location.href = "rawbt:base64," + base64;
     } else {
         const area = document.getElementById('area-impressao-termica');
-        if (!area) return alert("Erro: Div de impressão não encontrada no HTML.");
+        if (!area) return alert("Erro: Div de impressao nao encontrada.");
         
         area.innerHTML = cupomHTML;
         area.style.display = 'block';
-        window.print();
-        setTimeout(() => { area.style.display = 'none'; }, 500);
+        
+        // Pequeno delay para garantir que o estilo CSS seja aplicado antes de abrir o print
+        setTimeout(() => { 
+            window.print(); 
+            area.style.display = 'none';
+        }, 300);
     }
 }

@@ -1,13 +1,13 @@
 /* =============================================================
-   1. CONFIGURAÇÕES BASE (Do seu projeto original)
+   1. CONFIGURAÇÕES BASE
    ============================================================= */
 :root {
-    --primary-color: #e63946;      /* Seu Vermelho Original */
-    --secondary-color: #f8fafc;    /* Fundo secundário */
-    --bg-color: #f1f5f9;           /* Fundo da página (Slate) */
-    --text-color: #1e293b;         /* Texto Escuro (Slate 800) */
-    --success: #10b981;            /* Verde */
-    --warning: #f59e0b;            /* Amarelo/Laranja */
+    --primary-color: #e63946;
+    --secondary-color: #f8fafc;
+    --bg-color: #f1f5f9;
+    --text-color: #1e293b;
+    --success: #10b981;
+    --warning: #f59e0b;
     
     --card-radius: 16px;
     --font-stack: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -15,12 +15,11 @@
 
 * {
     -webkit-tap-highlight-color: transparent;
-    user-select: none;          /* App Feel: Não seleciona texto */
+    user-select: none;
     -webkit-user-select: none;
     box-sizing: border-box;
 }
 
-/* Permite digitar nos inputs e textareas */
 input, textarea {
     user-select: text !important;
     -webkit-user-select: text !important;
@@ -30,16 +29,15 @@ body {
     font-family: var(--font-stack);
     background-color: var(--bg-color);
     color: var(--text-color);
-    padding-bottom: 90px; /* Espaço extra para navbar */
+    padding-bottom: 90px;
     overflow-x: hidden;
-    overscroll-behavior-y: none; /* Bloqueia puxar pra atualizar */
+    overscroll-behavior-y: none;
 }
 
-/* Scrollbar invisível */
 ::-webkit-scrollbar { display: none; }
 
 /* =============================================================
-   2. ANIMAÇÕES (Do seu projeto original)
+   2. ANIMAÇÕES
    ============================================================= */
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(20px); }
@@ -51,11 +49,9 @@ body {
     to { opacity: 1; transform: scale(1); }
 }
 
-/* Classes utilitárias de animação */
 .animate-fade { animation: fadeInUp 0.4s ease-out forwards; }
 .animate-pop { animation: scaleIn 0.3s ease-out forwards; }
 
-/* Aplica animação nos cards automaticamente */
 .product-card, .card-cozinha {
     animation: fadeInUp 0.5s ease-out forwards;
 }
@@ -63,12 +59,10 @@ body {
 /* =============================================================
    3. COMPONENTES DE INTERFACE (UI)
    ============================================================= */
-
-/* HEADER */
 .app-header {
     background: white;
     padding: 15px 20px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); /* Sombra suave */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -78,15 +72,14 @@ body {
 }
 
 .brand-logo {
-    font-weight: 900; /* font-black */
+    font-weight: 900;
     color: var(--primary-color);
     text-transform: uppercase;
     font-size: 1.2rem;
-    letter-spacing: -0.05em; /* tracking-tighter */
+    letter-spacing: -0.05em;
     text-decoration: none;
 }
 
-/* NAVBAR INFERIOR (App Style) */
 .bottom-navbar {
     position: fixed;
     bottom: 0; left: 0; width: 100%;
@@ -99,14 +92,13 @@ body {
 
 .nav-item-app {
     display: flex; flex-direction: column; align-items: center;
-    text-decoration: none; color: #94a3b8; /* Slate 400 */
+    text-decoration: none; color: #94a3b8;
     font-size: 0.75rem; font-weight: 600;
     position: relative; transition: 0.3s;
 }
 
 .nav-item-app.active { color: var(--primary-color); }
 .nav-item-app i { font-size: 1.5rem; margin-bottom: 4px; }
-/* Efeito de clique nos ícones */
 .nav-item-app:active i { transform: scale(0.8); }
 
 .nav-badge {
@@ -116,18 +108,16 @@ body {
     border: 2px solid white;
 }
 
-/* CARDS DE PRODUTO */
 .product-card {
     background: white;
     border-radius: var(--card-radius);
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); /* shadow-sm */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
     border: 1px solid white;
     height: 100%;
     transition: transform 0.2s;
 }
 
-/* Feedback visual ao tocar (Seu código) */
 .product-card:active, button:active, .btn:active {
     transform: scale(0.95);
     filter: brightness(0.95);
@@ -145,119 +135,98 @@ body {
 }
 
 /* =============================================================
-   4. TELA DA COZINHA (KDS DARK)
+   4. TELA DA COZINHA & MODAIS
    ============================================================= */
 body.page-cozinha {
-    background-color: #0f172a; /* Slate 900 (Escuro Moderno) */
+    background-color: #0f172a;
     color: #f8fafc;
 }
 
 .header-cozinha {
-    background-color: #1e293b; /* Slate 800 */
+    background-color: #1e293b;
     border-bottom: 1px solid #334155;
     padding: 15px 20px;
 }
 
 .card-cozinha {
-    background-color: var(--warning); /* Amarelo do seu CSS */
+    background-color: var(--warning);
     color: #000;
     border: none;
     border-radius: 12px;
     font-weight: 700;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 
-.card-cozinha .btn {
-    border: 2px solid rgba(0,0,0,0.1);
-    text-transform: uppercase;
-    font-weight: 900;
-    background: rgba(255,255,255,0.3);
-    color: black;
-}
-
-/* Status laterais */
 .kds-status-Pendente { border-left: 8px solid #b91c1c; } 
 .kds-status-EmPreparo { border-left: 8px solid #c2410c; }
 .kds-status-EmRota { border-left: 8px solid #0369a1; background-color: #bae6fd; }
 
-/* =============================================================
-   5. MODAIS & UTILITÁRIOS
-   ============================================================= */
-/* Modal Bottom Sheet */
 .modal-bottom-sheet .modal-dialog {
     position: fixed; bottom: 0; left: 0; right: 0; margin: 0;
     transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .modal.show .modal-bottom-sheet .modal-dialog { transform: translateY(0); }
-.modal-bottom-sheet .modal-content { border-radius: 24px 24px 0 0; border: none; }
-.modal-drag-handle {
-    width: 40px; height: 5px; background: #cbd5e1;
-    border-radius: 10px; margin: 12px auto;
-}
 
-/* Botão Flutuante (FAB) */
-.fab-add {
-    position: fixed; bottom: 30px; right: 30px;
-    width: 60px; height: 60px;
-    background: var(--primary-color); color: white;
-    border-radius: 50%; border: none;
-    box-shadow: 0 10px 25px -5px rgba(230, 57, 70, 0.5);
-    font-size: 24px; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; z-index: 1050;
-}
+/* =============================================================
+   5. CONFIGURAÇÃO DEFINITIVA PARA IMPRESSORA TÉRMICA (58mm)
+   ============================================================= */
 
-/* Inputs bonitos */
-.form-control {
-    background-color: #f1f5f9;
-    border: 1px solid transparent;
-    border-radius: 12px;
-    padding: 12px;
-}
-.form-control:focus {
-    background-color: white;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.1);
-}
-
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* --- CONFIGURAÇÃO PARA IMPRESSORA TÉRMICA 58MM --- */
-
-/* Esconde a área de impressão na visualização normal do sistema */
+/* Esconde a área do cupom na tela do sistema */
 #area-impressao-termica { 
     display: none; 
 }
 
 @media print {
-    /* 1. Esconde tudo o que não deve ser impresso (menus, botões, painel) */
-    body * { 
-        visibility: hidden; 
-    }
-    
-    /* 2. Torna visível apenas o conteúdo do cupom */
-    #area-impressao-termica, #area-impressao-termica * {
-        visibility: visible;
-        font-family: 'Courier New', Courier, monospace; /* Fonte mono-espaçada padrão de cupom */
-    }
-
-    /* 3. Ajusta o container para o tamanho real da bobina de 58mm */
-    #area-impressao-termica {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 58mm;
-        padding: 0;
-        margin: 0;
-        background-color: white;
-    }
-
-    /* 4. Remove margens, cabeçalhos e rodapés automáticos do navegador (data, URL, etc) */
+    /* Remove margens e cabeçalhos automáticos do navegador */
     @page { 
         margin: 0; 
         size: auto; 
+    }
+
+    /* Esconde todo o layout do sistema */
+    body * { 
+        visibility: hidden; 
+    }
+
+    /* Reseta o body para não ocupar espaço fantasma */
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: white;
+    }
+
+    /* Torna apenas o cupom visível e o fixa no topo esquerdo */
+    #area-impressao-termica, 
+    #area-impressao-termica * {
+        visibility: visible;
+    }
+
+    #area-impressao-termica {
+        display: block !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 58mm; /* Força a largura da bobina */
+        max-width: 58mm;
+        margin: 0;
+        padding: 2mm 3mm 5mm 2mm; /* Margem interna para o texto não colar no corte */
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 12px;
+        line-height: 1.2;
+        color: #000;
+        background-color: #white;
+    }
+
+    /* Garante que textos longos não empurrem a largura */
+    #area-impressao-termica * {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        white-space: normal !important;
+    }
+
+    /* Linhas divisórias pontilhadas */
+    .divisor-print {
+        border-top: 1px dashed #000;
+        margin: 5px 0;
+        width: 100%;
     }
 }
