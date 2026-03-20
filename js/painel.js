@@ -1011,105 +1011,124 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     if (!pedido) return alert("Erro: Pedido não encontrado.");
 
     const removerAcentos = (str) => {
-        return str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/ç/gi, 'c').toUpperCase();
+        if (!str) return "";
+        const mapa = {'á':'a','à':'a','â':'a','ã':'a','ä':'a','Á':'A','À':'A','Â':'A','Ã':'A','Ä':'A','é':'e','è':'e','ê':'e','ë':'e','É':'E','È':'E','Ê':'E','Ë':'E','í':'i','ì':'i','î':'i','ï':'i','Í':'I','Ì':'I','Î':'I','Ï':'I','ó':'o','ò':'o','ô':'o','õ':'o','ö':'o','Ó':'O','Ò':'O','Ô':'O','Õ':'O','Ö':'O','ú':'u','ù':'u','û':'u','ü':'u','Ú':'U','Ù':'U','Û':'U','Ü':'U','ç':'c','Ç':'C','ñ':'n','Ñ':'N'};
+        let s = str.toString();
+        Object.keys(mapa).forEach(k => s = s.replace(new RegExp(k, 'g'), mapa[k]));
+        return s.toUpperCase();
     };
 
-    // --- CONFIGURAÇÃO DE COLUNAS (58mm = 32 colunas) ---
     const COLUNAS = 32; 
 
-    // FUNÇÃO PARA CENTRALIZAR TEXTO
-    const centralizar = (texto) => {
-        let t = removerAcentos(texto);
-        if (t.length >= COLUNAS) return t.substring(0, COLUNAS); // Se for maior que a bobina, corta
-        let espacosEsquerda = Math.floor((COLUNAS - t.length) / 2);
-        return " ".repeat(espacosEsquerda) + t;
+    // Função de quebra de linha que respeita o limite de colunas
+    const quebrarTexto = (texto, limite, recuo = 0) => {
+        let palavras = removerAcentos(texto).split(' ');
+        let linhas = [];
+        let linhaAtual = '';
+        let espacoRecuo = " ".repeat(recuo);
+
+        palavras.forEach(palavra => {
+            if ((linhaAtual + palavra).length <= limite) {
+                linhaAtual += (linhaAtual === '' ? '' : ' ') + palabra;
+            } else {
+                linhas.push(linhaAtual);
+                linhaAtual = palavra;
+            }
+        });
+        linhas.push(linhaAtual);
+        return linhas.join('\n' + espacoRecuo);
     };
 
-    // FUNÇÃO PARA ALINHAR ESQUERDA E DIREITA (Itens e Preços)
+    const centralizar = (texto) => {
+        let t = removerAcentos(texto);
+        let espacos = Math.max(0, Math.floor((COLUNAS - t.length) / 2));
+        return " ".repeat(espacos) + t;
+    };
+
     const formatarLinhaDupla = (esq, dir) => {
-        let textoEsq = esq.substring(0, COLUNAS - dir.length - 1);
+        let textoEsq = removerAcentos(esq).substring(0, COLUNAS - dir.length - 1);
         let espacos = COLUNAS - (textoEsq.length + dir.length);
         return textoEsq + " ".repeat(Math.max(1, espacos)) + dir;
     };
 
     const divisor = "-".repeat(COLUNAS);
 
-    // --- BUSCA DADOS DA LOJA ---
-    let nomeLoja = "MY DELIVERY";
+    // --- DADOS DA LOJA ---
+    let nomeLoja = "MARI DOCES";
     let telLoja = "";
     try {
         const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
         if (cfg) {
             nomeLoja = cfg.nome_loja || nomeLoja;
-            telLoja = cfg.telefone_loja || "";
+            telLoja = cfg.telefone_lo_formatado || cfg.telefone_loja || "";
         }
     } catch(e) {}
 
-    // --- MONTAGEM DO TEXTO (MODO COMANDA) ---
+    // --- MONTAGEM DO CORPO DO TEXTO ---
     let txt = "";
-    
-    // CABEÇALHO CENTRALIZADO
     txt += `${centralizar(nomeLoja)}\n`;
     if (telLoja) txt += `${centralizar("TEL: " + telLoja)}\n`;
     txt += `${centralizar("PEDIDO #" + pedido.id)}\n`;
-    
     txt += `${divisor}\n`;
-    txt += `DATA: ${new Date(pedido.created_at).toLocaleDateString('pt-BR')} ${new Date(pedido.created_at).toLocaleTimeString('pt-BR')}\n`;
-    txt += `CLIENTE: ${removerAcentos(pedido.cliente_nome || 'NAO INFORMADO')}\n`;
-    txt += `END: ${removerAcentos(pedido.endereco || 'RETIRADA').split('|')[0].trim()}\n`;
+    
+    txt += `DATA: ${new Date(pedido.created_at).toLocaleString('pt-BR')}\n`;
+    txt += `CLIENTE: ${quebrarTexto(pedido.cliente_nome || 'NÃO INFORMADO', 23, 9)}\n`;
+    
+    // Endereço com tratamento especial: Rua em cima, Cidade embaixo
+    let partesEnd = (pedido.endereco || 'RETIRADA').split('|');
+    let rua = partesEnd[0].trim();
+    let cidade = partesEnd[1] ? partesEnd[1].trim() : "";
+
+    txt += `END.: ${quebrarTexto(rua, 26, 6)}\n`;
+    if (cidade) txt += `${quebrarTexto(cidade, COLUNAS)}\n`;
+    
     txt += `PAGTO: ${removerAcentos(pedido.forma_pagamento || 'A COMBINAR')}\n`;
     txt += `${divisor}\n`;
     txt += `ITENS DO PEDIDO:\n\n`;
 
     pedido.itens.forEach(i => {
-        let nomeItem = `${i.qtd}X ${removerAcentos(i.nome)}`;
-        let precoItem = `R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}`;
-        txt += formatarLinhaDupla(nomeItem, precoItem) + "\n";
+        let nomeItem = `${i.qtd}X ${i.nome}`;
+        let precoTotalItem = `R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}`;
+        txt += formatarLinhaDupla(nomeItem, precoTotalItem) + "\n";
         
-        if (i.sabor) txt += ` OBS: ${removerAcentos(i.sabor)}\n`;
-        if (i.detalhes) txt += ` OBS: ${removerAcentos(i.detalhes)}\n`;
-        if (i.adicionais?.length > 0) txt += ` ADD: ${removerAcentos(i.adicionais.map(a=>a.nome).join(','))}\n`;
+        // Regra do SABOR (Obrigatório/Principal)
+        if (i.sabor) {
+            txt += `  SABOR: ${quebrarTexto(i.sabor, 23, 9)}\n`;
+        }
+
+        // Regra da OBSERVAÇÃO (Adicionais, Removidos ou Detalhes)
+        let obsTexto = "";
+        let complementos = [];
+        if (i.adicionais?.length) complementos.push("ADD: " + i.adicionais.map(a => a.nome).join(', '));
+        if (i.removidos?.length) complementos.push("SEM: " + i.removidos.join(', '));
+        if (i.detalhes) complementos.push(i.detalhes);
+
+        if (complementos.length > 0) {
+            obsTexto = complementos.join(' | ');
+            txt += `  OBS: ${quebrarTexto(obsTexto, 25, 7)}\n`;
+        }
+        txt += `\n`; // Espaço entre produtos
     });
 
     txt += `${divisor}\n`;
-    if (pedido.taxa_entrega > 0) {
-        txt += formatarLinhaDupla("TAXA ENTREGA:", `R$ ${parseFloat(pedido.taxa_entrega).toFixed(2).replace('.', ',')}`) + "\n";
-    }
     txt += formatarLinhaDupla("TOTAL:", `R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}`) + "\n";
-    txt += `${divisor}\n`;
-    txt += `\n${centralizar("OBRIGADO PELA PREFERENCIA!")}\n\n\n`;
+    txt += `${divisor}\n\n`;
+    txt += `${centralizar("OBRIGADO PELA PREFERENCIA!")}\n\n\n`;
 
-    // --- DETECÇÃO DE DISPOSITIVO ---
-    const ua = navigator.userAgent;
-    const isAndroid = /Android/i.test(ua);
-    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
-        // Lógica RawBT que já está funcionando perfeitamente
         const base64 = btoa(unescape(encodeURIComponent(txt)));
         window.location.href = "rawbt:base64," + base64;
-    } 
-    else if (isIOS) {
-        // No iOS, o melhor é injetar o HTML e chamar o AirPrint nativo
-        // Muitos apps de impressão de terceiros no iOS "escutam" esse comando
+    } else {
         const area = document.getElementById('area-impressao-termica');
         if (area) {
-            area.innerHTML = `<pre style="font-family:monospace; font-size:13px; padding:10px;">${txt}</pre>`;
-            area.style.display = 'block';
-            setTimeout(() => { 
-                window.print(); 
-                area.style.display = 'none';
-            }, 500);
-        }
-    } 
-    else {
-        // Lógica para Computador/Desktop
-        const area = document.getElementById('area-impressao-termica');
-        if (area) {
-            area.innerHTML = `<pre style="font-family:monospace; font-size:12px; padding:10px;">${txt}</pre>`;
+            // No PC usamos BOLD máximo para que a térmica queime o papel com mais força
+            area.innerHTML = `<pre style="font-family:monospace; font-size:12px; font-weight:900; color:black; line-height:1.2;">${txt}</pre>`;
             area.style.display = 'block';
             window.print();
             setTimeout(() => { area.style.display = 'none'; }, 500);
         }
     }
+}
 }
