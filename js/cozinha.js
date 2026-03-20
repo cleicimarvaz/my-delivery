@@ -5,13 +5,13 @@
 let PEDIDOS_ATIVOS = [];
 let somHabilitado = false;
 
-// Variáveis de controle de temporizadores (Novidade)
+// Variáveis de controle de temporizadores
 let intervaloSomPendente = null; 
 let intervaloAutoRefresh = null;
 
 window.addEventListener('click', function(e) {
     if (e.target.id === 'modal-alerta') window.fecharAlerta();
-    if (e.target.id === 'modal-confirmacao') {
+    if (target.id === 'modal-confirmacao') {
         const btnNao = document.getElementById('btn-confirm-nao');
         if (btnNao) btnNao.click();
     }
@@ -99,20 +99,39 @@ window.fazerLogout = async function() {
     } 
 }
 
-
 window.habilitarSom = function() {
     const audio = document.getElementById('som-notificacao');
-    if (!audio) return;
-    audio.play().then(() => {
-        audio.pause(); audio.currentTime = 0; somHabilitado = true;
-        document.getElementById('icone-som').className = 'ph-bold ph-speaker-high text-xl text-emerald-500';
-        document.getElementById('texto-som').innerHTML = 'Som<br>Ativo';
-        const btn = document.getElementById('btn-som');
-        btn.classList.replace('border-slate-200', 'border-emerald-200'); btn.classList.replace('dark:border-slate-600', 'dark:border-emerald-500/50');
-        btn.classList.replace('bg-slate-100', 'bg-emerald-50'); btn.classList.replace('dark:bg-slate-700', 'dark:bg-slate-800');
-        window.sysAlert('Áudio Ativado', 'A campainha vai tocar toda vez que um pedido novo chegar.', 'sucesso');
-        window.verificarLoopSom(); 
-    }).catch(err => { window.sysAlert('Atenção', 'Não foi possível ativar o som. Clique novamente.', 'erro'); });
+    const btn = document.getElementById('btn-som');
+    const icone = document.getElementById('icone-som');
+    const texto = document.getElementById('texto-som');
+
+    if (somHabilitado) {
+        // Se já está ligado, DESLIGA o som
+        somHabilitado = false;
+        if(icone) icone.className = 'ph-bold ph-speaker-slash text-xl text-slate-500 dark:text-white';
+        if(texto) texto.innerHTML = 'Ligar<br>Som';
+        if(btn) {
+            btn.classList.replace('border-emerald-200', 'border-slate-200'); btn.classList.replace('dark:border-emerald-500/50', 'dark:border-slate-600');
+            btn.classList.replace('bg-emerald-50', 'bg-slate-100'); btn.classList.replace('dark:bg-slate-800', 'dark:bg-slate-700');
+        }
+        if (intervaloSomPendente) { clearInterval(intervaloSomPendente); intervaloSomPendente = null; }
+    } else {
+        // Se está desligado, LIGA o som
+        if (audio) {
+            audio.play().then(() => {
+                audio.pause(); audio.currentTime = 0; 
+                somHabilitado = true;
+                if(icone) icone.className = 'ph-bold ph-speaker-high text-xl text-emerald-500';
+                if(texto) texto.innerHTML = 'Som<br>Ativo';
+                if(btn) {
+                    btn.classList.replace('border-slate-200', 'border-emerald-200'); btn.classList.replace('dark:border-slate-600', 'dark:border-emerald-500/50');
+                    btn.classList.replace('bg-slate-100', 'bg-emerald-50'); btn.classList.replace('dark:bg-slate-700', 'dark:bg-slate-800');
+                }
+                window.sysAlert('Áudio Ativado', 'A campainha vai tocar toda vez que um pedido novo chegar.', 'sucesso');
+                window.verificarLoopSom(); 
+            }).catch(err => { window.sysAlert('Atenção', 'Não foi possível ativar o som automaticamente. Clique no botão novamente.', 'erro'); });
+        }
+    }
 }
 
 window.tocarAlerta = function() {
@@ -120,10 +139,6 @@ window.tocarAlerta = function() {
     const audio = document.getElementById('som-notificacao');
     if (audio) { audio.currentTime = 0; audio.play().catch(e => console.log("Áudio bloqueado.")); }
 }
-
-// -------------------------------------------------------------
-// FUNÇÕES DE LOOP DE SOM E AUTO-REFRESH
-// -------------------------------------------------------------
 
 window.verificarLoopSom = function() {
     if (!somHabilitado) return;
@@ -156,6 +171,11 @@ window.toggleAutoRefresh = function() {
 }
 
 window.iniciarAutoRefresh = function() {
+    // Ativa por padrão na primeira visita
+    if (localStorage.getItem('autoRefreshCozinha') === null) {
+        localStorage.setItem('autoRefreshCozinha', 'true');
+    }
+
     const isAtivo = localStorage.getItem('autoRefreshCozinha') === 'true';
     const toggle = document.getElementById('toggle-auto-refresh');
     if(toggle) toggle.checked = isAtivo;
@@ -168,11 +188,36 @@ window.iniciarAutoRefresh = function() {
     }
 }
 
-// -------------------------------------------------------------
-
 window.onload = async () => { 
     window.atualizarBotaoTema(); 
+    
+    // 1. Inicia Refresh
     window.iniciarAutoRefresh(); 
+
+    // 2. Ativa o UI do Som
+    somHabilitado = true;
+    const btnSom = document.getElementById('btn-som');
+    if(btnSom) {
+        const icone = document.getElementById('icone-som');
+        const texto = document.getElementById('texto-som');
+        if(icone) icone.className = 'ph-bold ph-speaker-high text-xl text-emerald-500';
+        if(texto) texto.innerHTML = 'Som<br>Ativo';
+        btnSom.classList.replace('border-slate-200', 'border-emerald-200'); btnSom.classList.replace('dark:border-slate-600', 'dark:border-emerald-500/50');
+        btnSom.classList.replace('bg-slate-100', 'bg-emerald-50'); btnSom.classList.replace('dark:bg-slate-700', 'dark:bg-slate-800');
+    }
+
+    // 3. Truque para liberar áudio no primeiro clique do usuário
+    const desbloquearAudio = () => {
+        const audio = document.getElementById('som-notificacao');
+        if(audio && somHabilitado) {
+            audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+        }
+        document.removeEventListener('click', desbloquearAudio);
+        document.removeEventListener('touchstart', desbloquearAudio);
+    };
+    document.addEventListener('click', desbloquearAudio);
+    document.addEventListener('touchstart', desbloquearAudio);
+
     await window.carregarPedidosIniciais(); 
     window.escutarNovosPedidos(); 
 };
@@ -261,7 +306,12 @@ window.renderizarMonitor = function() {
                         <span class="text-slate-500 dark:text-slate-400 font-bold text-xs transition-colors">${hora}</span>
                         <div class="flex items-center gap-2">
                             <span class="text-[8px] font-black uppercase px-2 py-1 rounded-md ${badgeColor} transition-colors tracking-widest">${p.status}</span>
-                            <button onclick="window.imprimirPedido(${p.id})" class="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 dark:hover:text-white transition-all shadow-sm active:scale-95 border border-slate-200 dark:border-slate-600" title="Imprimir Comanda"><i class="ph-bold ph-printer text-xl"></i></button>
+                            
+                            <button onclick='window.imprimirPedidoMaster(${JSON.stringify(p)})' 
+                                    class="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 dark:hover:text-white transition-all shadow-sm active:scale-95 border border-slate-200 dark:border-slate-600" 
+                                    title="Imprimir Comanda">
+                                <i class="ph-bold ph-printer text-xl"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -281,113 +331,6 @@ window.formatarTelTicket = function(tel) {
     if (t.length === 11) return `(${t.slice(0,2)}) ${t.slice(2,3)} ${t.slice(3,7)}-${t.slice(7)}`;
     else if (t.length === 10) return `(${t.slice(0,2)}) ${t.slice(2,6)}-${t.slice(6)}`;
     return tel;
-}
-
-window.imprimirPedido = function(id) {
-    const p = PEDIDOS_ATIVOS.find(x => x.id === id);
-    if (!p) return;
-
-    const config = JSON.parse(localStorage.getItem('ticketConfig')) || { width: '58mm', footer: 'Obrigado pela preferência!' };
-    const maxLargura = config.width === '80mm' ? '300px' : '220px';
-    const fontSize = config.width === '80mm' ? '14px' : '12px';
-
-    let enderecoLimpo = (p.endereco || '-').split(' | ')[0];
-    let formaPgto = p.forma_pagamento || p.pagamento || '-';
-
-    const itensHtml = p.itens.map(i => {
-        let extras = "";
-        if (i.removidos && i.removidos.length > 0) extras += ` [!] SEM: ${i.removidos.join(', ')}`;
-        if (i.adicionais && i.adicionais.length > 0) extras += ` [+] ADD: ${i.adicionais.map(a => a.nome).join(', ')}`;
-        if (i.sabor) extras += ` [>] SABOR: ${i.sabor}`;
-        if (!extras && i.detalhes) extras = ` OBS: ${i.detalhes}`;
-
-        return `
-            <div style="margin-bottom: 4px; border-bottom: 1px dashed #000; padding-bottom: 4px;">
-                <div style="display: flex; justify-content: space-between; font-weight: 900;">
-                    <span style="font-size: 1.1em;">${i.qtd}x ${i.nome.toUpperCase()}</span>
-                    <span>R$ ${(i.preco * i.qtd).toFixed(2)}</span>
-                </div>
-                ${extras ? `<div style="font-size: 10px; margin-top: 2px; font-weight: 900;">${extras.toUpperCase()}</div>` : ''}
-            </div>
-        `;
-    }).join('');
-
-    // Prepara o visual da taxa de entrega, caso exista
-    let taxaEntregaHtml = '';
-    if (p.taxa_entrega && parseFloat(p.taxa_entrega) > 0) {
-        taxaEntregaHtml = `
-            <div style="display: flex; justify-content: space-between; font-size: 1.1em; font-weight: 900; margin-top: 5px;">
-                <span>TAXA ENTREGA:</span>
-                <span>R$ ${parseFloat(p.taxa_entrega).toFixed(2).replace('.', ',')}</span>
-            </div>
-        `;
-    }
-
-    const html = `
-    <html>
-    <head>
-        <title>Pedido #${p.id}</title>
-        <style>
-            @page { margin: 0; }
-            body { 
-                font-family: monospace; 
-                width: ${maxLargura}; 
-                margin: 0; 
-                padding: 10px; 
-                color: #000; 
-                font-size: ${fontSize}; 
-                font-weight: bold; 
-                line-height: 1.3;
-            }
-            .text-center { text-align: center; }
-            .hr { border-bottom: 1px dashed #000; margin: 8px 0; }
-        </style>
-    </head>
-    <body>
-        <h2 class="text-center" style="margin: 0; font-size: 18px;">MY-DELIVERY</h2>
-        <div class="text-center" style="font-size: 16px; font-weight: 900;">PEDIDO #${p.id}</div>
-        
-        <div class="hr"></div>
-
-        <div style="margin-bottom: 8px;">
-            <strong>HORA:</strong> ${new Date(p.created_at).toLocaleString('pt-BR')}<br>
-            <strong>CLIENTE:</strong> ${p.cliente_nome.toUpperCase()}<br>
-            <strong>TELEFONE:</strong> ${window.formatarTelTicket ? window.formatarTelTicket(p.cliente_tel) : p.cliente_tel}<br>
-            <strong>ENDEREÇO:</strong> ${enderecoLimpo.toUpperCase()}<br>
-            <strong>PAGAMENTO:</strong> ${formaPgto.toUpperCase()}<br>
-            <strong>REFERÊNCIA:</strong> ${(p.referencia || p.ponto_referencia || '-').toUpperCase()}
-        </div>
-
-        <div class="hr"></div>
-        <div style="margin-bottom: 5px; font-weight: 900;">ITENS DO PEDIDO:</div>
-        ${itensHtml}
-
-        <div style="margin-top: 10px;">
-            ${taxaEntregaHtml}
-            <div style="display: flex; justify-content: space-between; font-size: 1.3em; font-weight: 900; border-top: 1.5px solid #000; padding-top: 5px;">
-                <span>TOTAL:</span>
-                <span>R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</span>
-            </div>
-        </div>
-
-        <div class="hr"></div>
-        
-        <div class="text-center" style="font-size: 10px; margin-top: 15px;">
-            ${config.footer.toUpperCase()}
-        </div>
-
-        <script>
-            window.onload = function() { 
-                window.print(); 
-                setTimeout(function(){ window.close(); }, 500); 
-            }
-        <\/script>
-    </body>
-    </html>`;
-
-    const win = window.open('', '_blank', `width=450,height=700`);
-    win.document.write(html);
-    win.document.close();
 }
 
 window.atualizarStatus = async function(id, novoStatus) {
@@ -450,18 +393,15 @@ window.abrirPreviaPedido = function(id) {
     const p = PEDIDOS_ATIVOS.find(x => x.id === id);
     if (!p) return;
 
-    // Atualiza cabeçalho do modal
     const elId = document.getElementById('previa-id');
     if (elId) elId.innerText = `PEDIDO #${p.id}`;
 
-    // Atualiza informações do cliente (nome e endereço) no modal
     const elClienteNome = document.getElementById('previa-cliente-nome');
     if (elClienteNome) elClienteNome.innerText = p.cliente_nome;
     
     const elEndereco = document.getElementById('previa-endereco');
     if (elEndereco) elEndereco.innerText = p.endereco;
     
-    // Lista os itens no modal
     const elListaItens = document.getElementById('previa-lista-itens');
     if (elListaItens) {
         elListaItens.innerHTML = p.itens.map(i => `
@@ -475,7 +415,6 @@ window.abrirPreviaPedido = function(id) {
         `).join('');
     }
 
-    // Preenche os valores financeiros
     const subtotal = p.total - (p.taxa_entrega || 0);
     const elSubtotal = document.getElementById('previa-subtotal');
     if (elSubtotal) elSubtotal.innerText = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
@@ -486,7 +425,6 @@ window.abrirPreviaPedido = function(id) {
     const elTotal = document.getElementById('previa-total');
     if (elTotal) elTotal.innerText = `R$ ${p.total.toFixed(2).replace('.', ',')}`;
 
-    // Ação do botão "Aceitar"
     const btnAceitar = document.getElementById('btn-confirmar-preparo');
     if (btnAceitar) {
         btnAceitar.onclick = async () => {
@@ -495,7 +433,6 @@ window.abrirPreviaPedido = function(id) {
         };
     }
 
-    // Abre o Modal
     const modal = document.getElementById('modal-previa-pedido');
     if (modal) {
         modal.classList.remove('hidden');
@@ -507,6 +444,6 @@ window.fecharPrevia = () => {
     const modal = document.getElementById('modal-previa-pedido');
     if (modal) {
         modal.classList.add('hidden');
-        modal.style.display = 'none'; // Faltava essa linha para o modal sumir de verdade!
+        modal.style.display = 'none';
     }
 }

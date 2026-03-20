@@ -20,6 +20,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <link rel="stylesheet" href="css/style.css">
     
     <script>
         const sessaoAdmin = JSON.parse(localStorage.getItem('usuarioLogado'));
@@ -304,6 +306,7 @@
                     </button>
                 </div>
             </div>
+
             <div id="view-cfg-loja" class="hidden space-y-6">
                 <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
                 
@@ -319,6 +322,24 @@
                     <label for="upload-banner" class="w-full bg-purple-500 text-white py-4 rounded-xl font-black uppercase text-xs cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:bg-purple-600 transition-colors">
                         <i class="ph-bold ph-upload-simple text-lg"></i> Enviar Novo Banner
                     </label>
+
+                    <div class="mt-8 space-y-4">
+                        <h4 class="font-black text-[10px] text-slate-400 uppercase tracking-widest">Informações Cadastrais</h4>
+                        
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">Nome da Loja (Aparece no Cupom)</label>
+                            <input type="text" id="cfg-nome-loja" placeholder="Ex: MY-DELIVERY" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl text-xs font-bold uppercase mt-2 outline-none focus:border-purple-200 transition-colors">
+                        </div>
+                        
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase">Telefone de Contato</label>
+                            <input type="tel" id="cfg-tel-loja" oninput="window.mascaraTelefone(event)" maxlength="15" placeholder="(00) 00000-0000" class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl text-xs font-bold mt-2 outline-none focus:border-purple-200 transition-colors">
+                        </div>
+                        
+                        <button onclick="window.salvarDadosLoja()" class="w-full bg-emerald-500 text-white py-5 mt-4 rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-emerald-100 active:scale-95 transition-all">
+                            Salvar Informações
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -366,18 +387,30 @@
             </div>
 
             <div id="view-cfg-taxas" class="hidden space-y-6">
-                <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2"><i class="ph-bold ph-arrow-left"></i> Voltar</button>
-                <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                    <input type="hidden" id="edit-taxa-id">
-                    <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2">Cidades e Valores</p>
-                    <div class="flex gap-2 mb-6 bg-teal-50/50 p-2 rounded-2xl border border-teal-100">
-                        <input type="text" id="new-taxa-cidade" placeholder="NOME DA CIDADE" class="flex-1 bg-transparent p-3 text-xs font-bold uppercase outline-none text-teal-800">
-                        <input type="tel" id="new-taxa-valor" oninput="window.mascaraMoeda(event)" placeholder="R$" class="w-20 bg-transparent p-3 text-xs font-bold text-center border-l border-teal-200 outline-none">
-                        <button onclick="window.salvarTaxa()" id="btn-salvar-taxa" class="bg-teal-500 text-white w-12 h-12 rounded-xl font-black text-xl">+</button>
-                    </div>
-                    <div id="lista-taxas-sistema" class="space-y-2 max-h-60 overflow-y-auto custom-scroll pr-2"></div>
-                </div>
-            </div>
+    <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2 hover:text-slate-600 transition-colors">
+        <i class="ph-bold ph-arrow-left"></i> Voltar
+    </button>
+    
+    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+        <input type="hidden" id="edit-taxa-id">
+        <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2">Cidades e Valores</p>
+        
+        <div class="flex items-center gap-2 mb-6 bg-teal-50/50 p-1.5 rounded-2xl border border-teal-100 w-full">
+            <input type="text" id="new-taxa-cidade" placeholder="NOME DA CIDADE" 
+                   class="flex-1 min-w-0 bg-transparent p-3 text-[11px] font-bold uppercase outline-none text-teal-800 placeholder-teal-300">
+            
+            <input type="tel" id="new-taxa-valor" oninput="window.mascaraMoeda(event)" placeholder="R$" 
+                   class="w-16 shrink-0 bg-transparent p-3 text-[11px] font-bold text-center border-l border-teal-200 outline-none text-teal-800 placeholder-teal-300">
+            
+            <button onclick="window.salvarTaxa()" id="btn-salvar-taxa" 
+                    class="shrink-0 bg-teal-500 text-white w-10 h-10 rounded-xl font-black text-xl flex items-center justify-center shadow-lg shadow-teal-100 active:scale-95 transition-all">
+                +
+            </button>
+        </div>
+        
+        <div id="lista-taxas-sistema" class="space-y-2 max-h-60 overflow-y-auto custom-scroll pr-2"></div>
+    </div>
+</div>
 
             <div id="view-cfg-clientes" class="hidden space-y-6">
                 <div class="flex justify-between items-center">
@@ -408,48 +441,48 @@
                 </div>
             </div>
 
-<div id="view-cfg-insumos" class="hidden space-y-6">
-    <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2 hover:text-slate-600 transition-all">
-        <i class="ph-bold ph-arrow-left"></i> Voltar
-    </button>
+            <div id="view-cfg-insumos" class="hidden space-y-6">
+                <button onclick="window.voltarMenuConfig()" class="text-xs font-black text-slate-400 uppercase flex items-center gap-2 hover:text-slate-600 transition-all">
+                    <i class="ph-bold ph-arrow-left"></i> Voltar
+                </button>
 
-    <div class="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <input type="hidden" id="edit-ing-id">
-        <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2 italic tracking-widest">Itens Retiráveis (Ex: Sem Cebola)</p>
-        
-        <div class="flex items-center gap-2 mb-6 bg-orange-50/50 p-1.5 rounded-2xl border border-orange-100 w-full">
-            <input type="text" id="new-ing-name" placeholder="NOME DO ITEM" 
-                   class="flex-1 min-w-0 bg-transparent p-3 text-[11px] font-bold uppercase outline-none text-orange-800 placeholder-orange-200">
-            
-            <button onclick="window.salvarInsumo('ing')" id="btn-salvar-ing" 
-                    class="bg-orange-500 text-white w-10 h-10 rounded-xl font-black text-xl flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-orange-100 shrink-0">
-                +
-            </button>
-        </div>
-        
-        <div id="lista-ing-sistema" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></div>
-    </div>
+                <div class="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <input type="hidden" id="edit-ing-id">
+                    <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2 italic tracking-widest">Itens Retiráveis (Ex: Sem Cebola)</p>
+                    
+                    <div class="flex items-center gap-2 mb-6 bg-orange-50/50 p-1.5 rounded-2xl border border-orange-100 w-full">
+                        <input type="text" id="new-ing-name" placeholder="NOME DO ITEM" 
+                                class="flex-1 min-w-0 bg-transparent p-3 text-[11px] font-bold uppercase outline-none text-orange-800 placeholder-orange-200">
+                        
+                        <button onclick="window.salvarInsumo('ing')" id="btn-salvar-ing" 
+                                class="bg-orange-500 text-white w-10 h-10 rounded-xl font-black text-xl flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-orange-100 shrink-0">
+                            +
+                        </button>
+                    </div>
+                    
+                    <div id="lista-ing-sistema" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></div>
+                </div>
 
-    <div class="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <input type="hidden" id="edit-add-id">
-        <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2 italic tracking-widest">Adicionais Pagos (Extras)</p>
-        
-        <div class="flex items-center gap-2 mb-6 bg-emerald-50/50 p-1.5 rounded-2xl border border-emerald-100 w-full">
-            <input type="text" id="new-add-name" placeholder="NOME" 
-                   class="flex-1 min-w-0 bg-transparent p-3 text-[11px] font-bold uppercase outline-none text-emerald-800 placeholder-emerald-200">
-            
-            <input type="tel" id="new-add-price" oninput="window.mascaraMoeda(event)" placeholder="R$" 
-                   class="w-16 bg-transparent p-3 text-[11px] font-bold text-center border-l border-emerald-200 outline-none text-emerald-800 placeholder-emerald-200 shrink-0">
-            
-            <button onclick="window.salvarInsumo('add')" id="btn-salvar-add" 
-                    class="bg-emerald-500 text-white w-10 h-10 rounded-xl font-black text-xl flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-emerald-100 shrink-0">
-                +
-            </button>
-        </div>
-        
-        <div id="lista-add-sistema" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></div>
-    </div>
-</div>
+                <div class="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <input type="hidden" id="edit-add-id">
+                    <p class="text-[9px] font-black text-slate-400 uppercase mb-3 ml-2 italic tracking-widest">Adicionais Pagos (Extras)</p>
+                    
+                    <div class="flex items-center gap-2 mb-6 bg-emerald-50/50 p-1.5 rounded-2xl border border-emerald-100 w-full">
+                        <input type="text" id="new-add-name" placeholder="NOME" 
+                                class="flex-1 min-w-0 bg-transparent p-3 text-[11px] font-bold uppercase outline-none text-emerald-800 placeholder-emerald-200">
+                        
+                        <input type="tel" id="new-add-price" oninput="window.mascaraMoeda(event)" placeholder="R$" 
+                                class="w-16 bg-transparent p-3 text-[11px] font-bold text-center border-l border-emerald-200 outline-none text-emerald-800 placeholder-emerald-200 shrink-0">
+                        
+                        <button onclick="window.salvarInsumo('add')" id="btn-salvar-add" 
+                                class="bg-emerald-500 text-white w-10 h-10 rounded-xl font-black text-xl flex items-center justify-center active:scale-95 transition-all shadow-lg shadow-emerald-100 shrink-0">
+                            +
+                        </button>
+                    </div>
+                    
+                    <div id="lista-add-sistema" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></div>
+                </div>
+            </div>
             
         </div>
 
@@ -480,5 +513,9 @@
             });
         }
     </script>
+
+    <div id="area-impressao-termica">
+    </div>
+    
 </body>
 </html>

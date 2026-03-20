@@ -83,8 +83,10 @@ window.sysConfirm = function(titulo, texto) {
 /* =============================================================
    ESTADO GLOBAL E INICIALIZAÇÃO
    ============================================================= */
-let PRODUTOS_CACHE = [], LISTA_ING = [], LISTA_ADD = [], LISTA_SAB = [], ID_EDICAO = null; let CHART_SEMANA = null;
-let IMAGENS_TEMP_PROD = []; // Usado para gerenciar as fotos antes de salvar o produto
+let PRODUTOS_CACHE = [], PEDIDOS_LISTA = [], LISTA_ING = [], LISTA_ADD = [], LISTA_SAB = [], ID_EDICAO = null; 
+let CHART_SEMANA = null;
+let IMAGENS_TEMP_PROD = [];
+let NOME_LOJA = 'MY-DELIVERY';
 
 window.onload = async () => {
     const userJson = localStorage.getItem('usuarioLogado'); 
@@ -109,8 +111,11 @@ window.onload = async () => {
    MÓDULO: STATUS DA LOJA (ABERTA/FECHADA)
    ============================================================= */
 window.carregarStatusLoja = async function() {
-    const { data } = await _supabase.from('configuracoes').select('loja_aberta').eq('id', 1).single();
-    if(data) window.atualizarUIStatusLoja(data.loja_aberta);
+    const { data } = await _supabase.from('configuracoes').select('loja_aberta, nome_loja').eq('id', 1).single();
+    if(data) {
+        window.atualizarUIStatusLoja(data.loja_aberta);
+        if(data.nome_loja) NOME_LOJA = data.nome_loja.toUpperCase();
+    }
 }
 
 window.atualizarUIStatusLoja = function(aberta) {
@@ -162,11 +167,25 @@ window.abrirConfigEspecifica = async function(tipo) {
     if (tipo === 'taxas') window.carregarTaxasEntrega();
     if (tipo === 'clientes') window.carregarClientesPainel(); 
     if (tipo === 'loja') {
-        const { data } = await _supabase.from('configuracoes').select('banner_url').eq('id', 1).single();
-        if (data && data.banner_url) {
-            document.getElementById('preview-banner-loja').innerHTML = `<img src="${data.banner_url}" class="w-full h-full object-cover">`;
+        const { data } = await _supabase.from('configuracoes').select('*').eq('id', 1).single();
+        if (data) {
+            if (data.banner_url) document.getElementById('preview-banner-loja').innerHTML = `<img src="${data.banner_url}" class="w-full h-full object-cover">`;
+            if (document.getElementById('cfg-nome-loja')) document.getElementById('cfg-nome-loja').value = data.nome_loja || '';
+            if (document.getElementById('cfg-tel-loja')) document.getElementById('cfg-tel-loja').value = data.telefone_loja || '';
         }
     }
+}
+
+// NOVA FUNÇÃO PARA SALVAR OS DADOS DA LOJA
+window.salvarDadosLoja = async function() {
+    const nome = document.getElementById('cfg-nome-loja').value.trim();
+    const tel = document.getElementById('cfg-tel-loja').value.trim();
+    
+    await _supabase.from('configuracoes').update({ nome_loja: nome, telefone_loja: tel }).eq('id', 1);
+    
+    NOME_LOJA = nome || 'MY-DELIVERY'; // Atualiza imediatamente na memória
+    await window.registrarAuditoria("CONFIGURAÇÃO", "Alterou os dados cadastrais da loja");
+    window.sysAlert('Sucesso!', 'Os dados da loja foram atualizados com sucesso.', 'sucesso');
 }
 
 window.voltarMenuConfig = function() { 
@@ -222,7 +241,6 @@ window.salvarProduto = async function() {
     
     if (!nome || preco <= 0) return window.sysAlert('Erro', 'Preencha o Nome e o Preço.', 'erro');
     
-    // Tratamento das Imagens (Upload Múltiplo)
     const capaAtual = IMAGENS_TEMP_PROD.find(i => i.isCapa);
     const fotoFinal = capaAtual ? capaAtual.url : '';
     const galeriaFinal = IMAGENS_TEMP_PROD.filter(i => !i.isCapa).map(i => i.url);
@@ -263,7 +281,6 @@ window.prepararEdicao = function(id) {
     document.getElementById('p-categoria').value = p.categoria; 
     document.getElementById('p-desc').value = p.descricao; 
 
-    // Carregar imagens antigas no componente
     IMAGENS_TEMP_PROD = [];
     if(p.foto) IMAGENS_TEMP_PROD.push({ url: p.foto, isCapa: true });
     
@@ -600,10 +617,33 @@ window.gerarRelatorioFinanceiro = async function() {
     document.getElementById('conteudo-rel-financeiro').innerHTML = `<div class="bg-emerald-50 p-6 rounded-[2rem] text-center border border-emerald-100 shadow-sm"><p class="text-[10px] font-black uppercase text-emerald-500 mb-1">Total Faturado</p><h3 class="text-4xl font-black text-emerald-600 italic">R$ ${total.toFixed(2)}</h3></div>`; 
 }
 
+/* HISTÓRICO DE VENDAS E ESTORNO (CORRIGIDO BUG DO MAP) */
 window.carregarHistoricoEstorno = async function() { 
     const { data } = await _supabase.from('pedidos').select('*').neq('status','Cancelado').order('created_at',{ascending:false}).limit(15); 
     const container = document.getElementById('lista-vendas-estorno') || document.getElementById('lista-vendas-estorno-principal');
-    if(container) container.innerHTML = (data||[]).map(p => `<div class="bg-white p-4 rounded-2xl mb-2 shadow-sm border border-slate-100"><div class="flex justify-between items-center mb-3"><div><span class="text-[9px] font-black text-slate-400 block">Pedido #${p.id}</span><span class="text-xs font-black text-slate-700">${p.cliente_nome}</span></div><span class="text-xs font-black text-emerald-500">R$ ${p.total.toFixed(2)}</span></div><button onclick="window.estornar(${p.id})" class="w-full bg-red-50 text-red-500 py-2 rounded-xl text-[10px] font-black uppercase border border-red-100">Estornar</button></div>`).join(''); 
+    
+    if(container) {
+        container.innerHTML = (data||[]).map(p => `
+        <div class="bg-white p-4 rounded-2xl mb-2 shadow-sm border border-slate-100">
+            <div class="flex justify-between items-center mb-3">
+                <div>
+                    <span class="text-[9px] font-black text-slate-400 block">Pedido #${p.id}</span>
+                    <span class="text-xs font-black text-slate-700">${p.cliente_nome}</span>
+                </div>
+                <span class="text-xs font-black text-emerald-500">R$ ${p.total.toFixed(2)}</span>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick='window.imprimirPedidoMaster(${JSON.stringify(p)})' class="flex-1 bg-blue-50 text-blue-600 py-2 rounded-xl text-[10px] font-black uppercase border border-blue-100 flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-printer"></i> Imprimir
+                </button>
+                
+                <button onclick="window.estornar(${p.id})" class="flex-1 bg-red-50 text-red-500 py-2 rounded-xl text-[10px] font-black uppercase border border-red-100">
+                    Estornar
+                </button>
+            </div>
+        </div>`).join('');
+    }
 }
 
 window.estornar = async function(id) { 
@@ -623,11 +663,26 @@ window.salvarConfigTicket = async function() {
 
 window.mascaraMoeda = function(e) { let v=e.target.value.replace(/\D/g,""); e.target.value=(parseInt(v||0)/100).toFixed(2).replace(".",","); }
 window.convMoedaFloat = function(v) { return parseFloat((v||"0").replace(/\./g,'').replace(',','.'))||0; }
+
+// --- ADICIONE ESTA NOVA FUNÇÃO AQUI ---
+window.mascaraTelefone = function(e) {
+    let v = e.target.value.replace(/\D/g, ""); // Remove tudo que não é número
+    v = v.substring(0, 11); // Limita a 11 dígitos
+    
+    if (v.length <= 10) {
+        v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+        v = v.replace(/(\d{4})(\d)/, "$1-$2");
+    } else {
+        v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+        v = v.replace(/(\d{5})(\d)/, "$1-$2");
+    }
+    e.target.value = v;
+}
+// --------------------------------------
 window.limparCamposProduto = function() { 
     document.getElementById('p-nome').value=''; 
     document.getElementById('p-preco').value='0,00'; 
     document.getElementById('p-desc').value=''; 
-    // SE O INPUT TEXTO ANTIGO DA FOTO AINDA ESTIVER NO HTML, ISSO EVITA ERROS
     if(document.getElementById('p-foto')) document.getElementById('p-foto').value=''; 
     ID_EDICAO=null; 
     
@@ -808,11 +863,8 @@ window.filtrarClientesLista = function() {
    MÓDULO: GESTÃO DE FICHEIROS E IMAGENS (STORAGE)
    ============================================================= */
 
-// 1. LÓGICA DO BANNER DA LOJA
-// Variável para guardar o "motor" do cortador
 let cropperInstance = null;
 
-// 1. Quando o usuário escolhe a foto, abrimos o modal em vez de enviar direto
 window.uploadBannerLoja = function(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -822,33 +874,28 @@ window.uploadBannerLoja = function(event) {
         const imgElement = document.getElementById('image-to-crop');
         imgElement.src = e.target.result;
 
-        // Mostra a telinha de corte
         const modal = document.getElementById('modal-cropper');
         modal.classList.remove('hidden');
         modal.style.display = 'flex';
         setTimeout(() => modal.style.opacity = '1', 10);
 
-        // Inicia o motor de corte fixando um retângulo de banner (16:9)
         if (cropperInstance) cropperInstance.destroy();
         cropperInstance = new Cropper(imgElement, {
-            aspectRatio: 16 / 9, // Formato retangular
-            viewMode: 1, // Não deixa arrastar para fora da imagem
-            dragMode: 'move', // Permite arrastar com o dedo
+            aspectRatio: 16 / 9, 
+            viewMode: 1, 
+            dragMode: 'move', 
             autoCropArea: 1,
             guides: true,
             center: true,
             highlight: false,
-            cropBoxMovable: false, // Trava a caixa, o usuário arrasta a foto
+            cropBoxMovable: false, 
             cropBoxResizable: false,
         });
     };
     reader.readAsDataURL(file);
-    
-    // Limpa o input para poder escolher a mesma foto se quiser testar de novo
     event.target.value = '';
 }
 
-// 2. Função para fechar o modal e desligar o motor
 window.fecharModalCropper = function() {
     const modal = document.getElementById('modal-cropper');
     modal.style.opacity = '0';
@@ -862,15 +909,13 @@ window.fecharModalCropper = function() {
     }, 200);
 }
 
-// 3. Função que recorta, salva e envia pro Supabase!
 window.cortarESalvarBanner = async function() {
     if (!cropperInstance) return;
 
     window.sysAlert('Aguarde...', 'Recortando e enviando o banner para a loja.', 'info');
 
-    // Pega a parte da imagem que está dentro do retângulo
     cropperInstance.getCroppedCanvas({
-        width: 800, // Largura ideal para ficar leve no celular
+        width: 800, 
         height: 450,
         imageSmoothingEnabled: true,
         imageSmoothingQuality: 'high',
@@ -880,7 +925,6 @@ window.cortarESalvarBanner = async function() {
         const fileName = `banner_${Date.now()}.jpg`;
         const filePath = `loja/${fileName}`;
 
-        // Envia para o Supabase
         const { error } = await _supabase.storage.from('imagens').upload(filePath, blob, {
             contentType: 'image/jpeg'
         });
@@ -890,22 +934,18 @@ window.cortarESalvarBanner = async function() {
             return window.sysAlert('Erro', 'Falha ao enviar a imagem.', 'erro');
         }
 
-        // Pega o link da imagem recortada
         const { data: publicUrlData } = _supabase.storage.from('imagens').getPublicUrl(filePath);
         const bannerUrl = publicUrlData.publicUrl;
 
-        // Salva na tabela
         await _supabase.from('configuracoes').update({ banner_url: bannerUrl }).eq('id', 1);
         
-        // Atualiza a pré-visualização no painel
         document.getElementById('preview-banner-loja').innerHTML = `<img src="${bannerUrl}" class="w-full h-full object-cover">`;
         
         window.fecharModalCropper();
         window.sysAlert('Sucesso!', 'Seu banner foi recortado e já está na loja!', 'sucesso');
-    }, 'image/jpeg', 0.8); // 0.8 é a qualidade (80% para ficar rápido de carregar)
+    }, 'image/jpeg', 0.8); 
 }
 
-// 2. LÓGICA DA GALERIA DE PRODUTOS
 window.uploadImagensProduto = async function(event) {
     const files = event.target.files;
     if(!files || files.length === 0) return;
@@ -960,4 +1000,151 @@ window.removerImagemProd = function(idx) {
     IMAGENS_TEMP_PROD.splice(idx, 1);
     if(IMAGENS_TEMP_PROD.length > 0 && !IMAGENS_TEMP_PROD.some(i => i.isCapa)) IMAGENS_TEMP_PROD[0].isCapa = true;
     window.renderPreviewImagensProd();
+}
+
+/* =============================================================
+   FUNÇÃO MESTRE DE IMPRESSÃO - RÉPLICA EXATA DO CUPOM ORIGINAL
+   ============================================================= */
+window.imprimirPedidoMaster = async function(pedidoOuId) {
+    let pedido;
+
+    if (typeof pedidoOuId === 'string' || typeof pedidoOuId === 'number') {
+        pedido = PEDIDOS_LISTA.find(p => p.id == pedidoOuId);
+    } else {
+        pedido = pedidoOuId;
+    }
+
+    if (!pedido) return alert("Erro: Pedido não encontrado para impressão.");
+
+    // BUSCA OS DADOS DA LOJA DIRETAMENTE DO BANCO ANTES DE IMPRIMIR E FORMATA
+    let nomeDaLoja = 'MY-DELIVERY';
+    let telefoneDaLoja = '';
+    try {
+        const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
+        if (cfg) {
+            if (cfg.nome_loja) nomeDaLoja = cfg.nome_loja.toUpperCase();
+            if (cfg.telefone_loja) {
+                // Formata o telefone da loja
+                let tLoja = cfg.telefone_loja.replace(/\D/g, '');
+                if (tLoja.startsWith('55') && tLoja.length >= 12) tLoja = tLoja.slice(2);
+                if (tLoja.length === 11) telefoneDaLoja = `(${tLoja.slice(0,2)}) ${tLoja.slice(2,3)} ${tLoja.slice(3,7)}-${tLoja.slice(7)}`;
+                else if (tLoja.length === 10) telefoneDaLoja = `(${tLoja.slice(0,2)}) ${tLoja.slice(2,6)}-${tLoja.slice(6)}`;
+                else telefoneDaLoja = cfg.telefone_loja;
+            }
+        }
+    } catch(e) { console.error("Aviso: Imprimindo com nome padrão."); }
+
+    const config = JSON.parse(localStorage.getItem('ticketConfig')) || { width: '58mm', footer: 'Obrigado pela preferência!' };
+    const maxLargura = config.width === '80mm' ? '300px' : '220px';
+    const fontSize = config.width === '80mm' ? '14px' : '12px';
+
+    let enderecoLimpo = (pedido.endereco || '-').split(' | ')[0];
+    let formaPgto = pedido.forma_pagamento || pedido.pagamento || '-';
+    
+    // Formata o Telefone do Cliente
+    let telFormatado = pedido.cliente_tel || 'Não informado';
+    if (telFormatado !== 'Não informado') {
+        let t = telFormatado.replace(/\D/g, '');
+        if (t.startsWith('55') && t.length >= 12) t = t.slice(2);
+        if (t.length === 11) telFormatado = `(${t.slice(0,2)}) ${t.slice(2,3)} ${t.slice(3,7)}-${t.slice(7)}`;
+        else if (t.length === 10) telFormatado = `(${t.slice(0,2)}) ${t.slice(2,6)}-${t.slice(6)}`;
+    }
+
+    const linhaTracejada = `<div class="linha-tracejada" style="border-bottom: 1px dashed #000; margin: 8px 0;"></div>`;
+    const linhaContinua = `<div class="linha-continua" style="border-bottom: 2px solid #000; margin-bottom: 8px;"></div>`;
+
+    const itensHtml = pedido.itens.map(i => {
+        let extrasHTML = "";
+        if (i.sabor) extrasHTML += `<div>OBS: SABOR: ${i.sabor.toUpperCase()}</div>`;
+        if (i.adicionais && i.adicionais.length > 0) extrasHTML += `<div>OBS: ADD: ${i.adicionais.map(a=>a.nome).join(', ').toUpperCase()}</div>`;
+        if (i.removidos && i.removidos.length > 0) extrasHTML += `<div>OBS: SEM: ${i.removidos.join(', ').toUpperCase()}</div>`;
+        if (!extrasHTML && i.detalhes) extrasHTML += `<div>OBS: ${i.detalhes.toUpperCase()}</div>`;
+
+        return `
+            <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>${i.qtd}x ${i.nome.toUpperCase()}</span>
+                    <span>R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}</span>
+                </div>
+                ${extrasHTML}
+            </div>
+        `;
+    }).join('');
+
+    let taxaEntregaHtml = '';
+    if (pedido.taxa_entrega && parseFloat(pedido.taxa_entrega) > 0) {
+        taxaEntregaHtml = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span>TAXA ENTREGA:</span>
+                <span>R$ ${parseFloat(pedido.taxa_entrega).toFixed(2).replace('.', ',')}</span>
+            </div>
+        `;
+    }
+
+    // Prepara o bloco do telefone da loja (agora formatado!)
+    const htmlTelefoneLoja = telefoneDaLoja ? `<div style="text-align: center; font-size: 1.1em; margin-bottom: 4px;">TEL: ${telefoneDaLoja}</div>` : '';
+
+    const cupomHTML = `
+        <div style="width: ${maxLargura}; font-family: 'Courier New', Courier, monospace; font-size: ${fontSize}; color: #000; font-weight: bold; line-height: 1.5;">
+            
+            <div style="text-align: center; font-size: 1.4em;">${nomeDaLoja}</div>
+            ${htmlTelefoneLoja}
+            <div style="text-align: center; font-size: 1.2em;">PEDIDO #${pedido.id.toString()}</div>
+            
+            ${linhaTracejada}
+            
+            <div>HORA: ${new Date(pedido.created_at).toLocaleString('pt-BR')}</div>
+            <div>CLIENTE: ${pedido.cliente_nome ? pedido.cliente_nome.toUpperCase() : 'NÃO INFORMADO'}</div>
+            <div>TELEFONE: ${telFormatado}</div>
+            <div>ENDEREÇO: ${enderecoLimpo.toUpperCase()}</div>
+            <div>PAGAMENTO: ${formaPgto.toUpperCase()}</div>
+            <div>REFERÊNCIA: ${(pedido.referencia || pedido.ponto_referencia || '-').toUpperCase()}</div>
+            
+            ${linhaTracejada}
+            
+            <div style="margin-bottom: 12px;">ITENS DO PEDIDO:</div>
+            
+            ${itensHtml}
+            
+            ${linhaTracejada}
+            ${linhaContinua}
+            
+            ${taxaEntregaHtml}
+            
+            <div style="display: flex; justify-content: space-between; font-size: 1.4em;">
+                <span>TOTAL:</span>
+                <span>R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}</span>
+            </div>
+            
+            ${linhaTracejada}
+            
+            <div style="text-align: center; margin-top: 15px;">
+                ${config.footer.toUpperCase()}
+            </div>
+        </div>
+    `;
+
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    if (isAndroid) {
+        let textoPuro = cupomHTML
+            .replace(/<div[^>]*class="linha-tracejada"[^>]*><\/div>/gi, '\n--------------------------------\n')
+            .replace(/<div[^>]*class="linha-continua"[^>]*><\/div>/gi, '\n________________________________\n')
+            .replace(/<\/div>/gi, '\n')
+            .replace(/<br\s*[\/]?>/gi, '\n')
+            .replace(/<[^>]*>/g, '') 
+            .replace(/\n\s*\n/g, '\n') 
+            .trim();
+            
+        const base64 = btoa(unescape(encodeURIComponent(textoPuro)));
+        window.location.href = "rawbt:base64," + base64;
+    } else {
+        const area = document.getElementById('area-impressao-termica');
+        if (!area) return alert("Erro: Div de impressão não encontrada no HTML.");
+        
+        area.innerHTML = cupomHTML;
+        area.style.display = 'block';
+        window.print();
+        setTimeout(() => { area.style.display = 'none'; }, 500);
+    }
 }

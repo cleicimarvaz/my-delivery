@@ -224,3 +224,40 @@ body.page-cozinha {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* --- CONFIGURAÇÃO PARA IMPRESSORA TÉRMICA 58MM --- */
+
+/* Esconde a área de impressão na visualização normal do sistema */
+#area-impressao-termica { 
+    display: none; 
+}
+
+@media print {
+    /* 1. Esconde tudo o que não deve ser impresso (menus, botões, painel) */
+    body * { 
+        visibility: hidden; 
+    }
+    
+    /* 2. Torna visível apenas o conteúdo do cupom */
+    #area-impressao-termica, #area-impressao-termica * {
+        visibility: visible;
+        font-family: 'Courier New', Courier, monospace; /* Fonte mono-espaçada padrão de cupom */
+    }
+
+    /* 3. Ajusta o container para o tamanho real da bobina de 58mm */
+    #area-impressao-termica {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 58mm;
+        padding: 0;
+        margin: 0;
+        background-color: white;
+    }
+
+    /* 4. Remove margens, cabeçalhos e rodapés automáticos do navegador (data, URL, etc) */
+    @page { 
+        margin: 0; 
+        size: auto; 
+    }
+}
