@@ -1079,17 +1079,34 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     txt += `${divisor}\n`;
     txt += `\n${centralizar("OBRIGADO PELA PREFERENCIA!")}\n\n\n`;
 
-    // --- ENVIO ---
-    const isAndroid = /Android/i.test(navigator.userAgent);
+    // --- DETECÇÃO DE DISPOSITIVO ---
+    const ua = navigator.userAgent;
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
 
     if (isAndroid) {
+        // Lógica RawBT que já está funcionando perfeitamente
         const base64 = btoa(unescape(encodeURIComponent(txt)));
         window.location.href = "rawbt:base64," + base64;
-    } else {
-        // No PC, usamos <pre> para manter os espaços e o alinhamento
+    } 
+    else if (isIOS) {
+        // No iOS, o melhor é injetar o HTML e chamar o AirPrint nativo
+        // Muitos apps de impressão de terceiros no iOS "escutam" esse comando
         const area = document.getElementById('area-impressao-termica');
         if (area) {
-            area.innerHTML = `<pre style="font-family:monospace; font-size:12px; margin:0; padding:10px; width:220px; background:white;">${txt}</pre>`;
+            area.innerHTML = `<pre style="font-family:monospace; font-size:13px; padding:10px;">${txt}</pre>`;
+            area.style.display = 'block';
+            setTimeout(() => { 
+                window.print(); 
+                area.style.display = 'none';
+            }, 500);
+        }
+    } 
+    else {
+        // Lógica para Computador/Desktop
+        const area = document.getElementById('area-impressao-termica');
+        if (area) {
+            area.innerHTML = `<pre style="font-family:monospace; font-size:12px; padding:10px;">${txt}</pre>`;
             area.style.display = 'block';
             window.print();
             setTimeout(() => { area.style.display = 'none'; }, 500);
