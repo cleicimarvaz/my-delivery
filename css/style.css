@@ -176,57 +176,42 @@ body.page-cozinha {
 }
 
 @media print {
-    /* Remove margens e cabeçalhos automáticos do navegador */
     @page { 
-        margin: 0; 
-        size: auto; 
+        margin: 0 !important; 
     }
 
-    /* Esconde todo o layout do sistema */
-    body * { 
-        visibility: hidden; 
-    }
-
-    /* Reseta o body para não ocupar espaço fantasma */
-    body {
-        margin: 0;
-        padding: 0;
-        background-color: white;
-    }
-
-    /* Torna apenas o cupom visível e o fixa no topo esquerdo */
-    #area-impressao-termica, 
-    #area-impressao-termica * {
-        visibility: visible;
-    }
+    body * { visibility: hidden; }
 
     #area-impressao-termica {
+        visibility: visible !important;
         display: block !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 58mm; /* Força a largura da bobina */
-        max-width: 58mm;
-        margin: 0;
-        padding: 2mm 3mm 5mm 2mm; /* Margem interna para o texto não colar no corte */
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 12px;
-        line-height: 1.2;
-        color: #000;
-        background-color: #white;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        
+        /* Ajuste de largura para 58mm real */
+        width: 200px !important; 
+        max-width: 200px !important;
+        
+        /* Margens de segurança para o texto não 'sumir' nas bordas */
+        padding-left: 15px !important; 
+        padding-right: 5px !important;
+        
+        margin: 0 !important;
+        background-color: white !important;
     }
 
-    /* Garante que textos longos não empurrem a largura */
     #area-impressao-termica * {
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-        white-space: normal !important;
+        visibility: visible !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        font-size: 11px !important; /* Fonte menor ajuda a não quebrar linhas */
+        line-height: 1.1 !important;
+        text-align: left !important;
     }
 
-    /* Linhas divisórias pontilhadas */
-    .divisor-print {
-        border-top: 1px dashed #000;
-        margin: 5px 0;
-        width: 100%;
+    /* Força os divisores a ocuparem a largura correta */
+    .linha-tracejada, .linha-continua {
+        width: 100% !important;
+        border-bottom: 1px dashed #000 !important;
     }
 }
