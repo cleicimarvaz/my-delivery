@@ -664,10 +664,9 @@ window.salvarConfigTicket = async function() {
 window.mascaraMoeda = function(e) { let v=e.target.value.replace(/\D/g,""); e.target.value=(parseInt(v||0)/100).toFixed(2).replace(".",","); }
 window.convMoedaFloat = function(v) { return parseFloat((v||"0").replace(/\./g,'').replace(',','.'))||0; }
 
-// --- ADICIONE ESTA NOVA FUNÇÃO AQUI ---
 window.mascaraTelefone = function(e) {
-    let v = e.target.value.replace(/\D/g, ""); // Remove tudo que não é número
-    v = v.substring(0, 11); // Limita a 11 dígitos
+    let v = e.target.value.replace(/\D/g, ""); 
+    v = v.substring(0, 11); 
     
     if (v.length <= 10) {
         v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
@@ -678,7 +677,7 @@ window.mascaraTelefone = function(e) {
     }
     e.target.value = v;
 }
-// --------------------------------------
+
 window.limparCamposProduto = function() { 
     document.getElementById('p-nome').value=''; 
     document.getElementById('p-preco').value='0,00'; 
@@ -689,6 +688,7 @@ window.limparCamposProduto = function() {
     IMAGENS_TEMP_PROD = [];
     window.renderPreviewImagensProd();
 }
+
 window.logout = window.fazerLogout = async function() { 
     if(await window.sysConfirm('Sair', 'Encerrar sessão?')) { localStorage.removeItem('usuarioLogado'); window.location.href = 'login.html'; }
 };
@@ -1002,6 +1002,9 @@ window.removerImagemProd = function(idx) {
     window.renderPreviewImagensProd();
 }
 
+/* =============================================================
+   MÓDULO: IMPRESSÃO DE PEDIDOS
+   ============================================================= */
 window.imprimirPedidoMaster = async function(pedidoOuId) {
     let pedido;
     if (typeof pedidoOuId === 'string' || typeof pedidoOuId === 'number') {
@@ -1029,7 +1032,7 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
 
         palavras.forEach(palavra => {
             if ((linhaAtual + palavra).length <= limite) {
-                linhaAtual += (linhaAtual === '' ? '' : ' ') + palabra;
+                linhaAtual += (linhaAtual === '' ? '' : ' ') + palavra;
             } else {
                 linhas.push(linhaAtual);
                 linhaAtual = palavra;
@@ -1054,7 +1057,7 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     const divisor = "-".repeat(COLUNAS);
 
     // --- DADOS DA LOJA ---
-    let nomeLoja = "MARI DOCES";
+    let nomeLoja = "MY DELIVERY";
     let telLoja = "";
     try {
         const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
