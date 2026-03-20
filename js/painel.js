@@ -1002,9 +1002,6 @@ window.removerImagemProd = function(idx) {
     window.renderPreviewImagensProd();
 }
 
-/* =============================================================
-   FUNÇÃO MESTRE DE IMPRESSÃO - RÉPLICA EXATA DO CUPOM ORIGINAL
-   ============================================================= */
 window.imprimirPedidoMaster = async function(pedidoOuId) {
     let pedido;
     if (typeof pedidoOuId === 'string' || typeof pedidoOuId === 'number') {
@@ -1013,39 +1010,49 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
 
     if (!pedido) return alert("Erro: Pedido não encontrado.");
 
-    // Função interna para limpar acentos (vital para o RawBT não bugar)
     const removerAcentos = (str) => {
         return str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/ç/gi, 'c').toUpperCase();
     };
 
-    // --- DADOS DA LOJA ---
-    let nomeLoja = "MY DELIVERY";
-    let telLoja = "";
-    try {
-        const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
-        if (cfg) {
-            nomeLoja = removerAcentos(cfg.nome_loja || nomeLoja);
-            telLoja = cfg.telefone_loja || "";
-        }
-    } catch(e) {}
-
-    // --- CONFIGURAÇÃO DE COLUNAS (58mm = 32 colunas padrão) ---
+    // --- CONFIGURAÇÃO DE COLUNAS (58mm = 32 colunas) ---
     const COLUNAS = 32; 
 
-    // Função para alinhar ESQUERDA e DIREITA na mesma linha (Ex: Item .... R$ 10)
+    // FUNÇÃO PARA CENTRALIZAR TEXTO
+    const centralizar = (texto) => {
+        let t = removerAcentos(texto);
+        if (t.length >= COLUNAS) return t.substring(0, COLUNAS); // Se for maior que a bobina, corta
+        let espacosEsquerda = Math.floor((COLUNAS - t.length) / 2);
+        return " ".repeat(espacosEsquerda) + t;
+    };
+
+    // FUNÇÃO PARA ALINHAR ESQUERDA E DIREITA (Itens e Preços)
     const formatarLinhaDupla = (esq, dir) => {
-        let textoEsq = esq.substring(0, COLUNAS - dir.length - 1); // Corta se for muito longo
+        let textoEsq = esq.substring(0, COLUNAS - dir.length - 1);
         let espacos = COLUNAS - (textoEsq.length + dir.length);
         return textoEsq + " ".repeat(Math.max(1, espacos)) + dir;
     };
 
     const divisor = "-".repeat(COLUNAS);
 
-    // --- MONTAGEM DO TEXTO PARA ANDROID (RAWBT) ---
+    // --- BUSCA DADOS DA LOJA ---
+    let nomeLoja = "MY DELIVERY";
+    let telLoja = "";
+    try {
+        const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
+        if (cfg) {
+            nomeLoja = cfg.nome_loja || nomeLoja;
+            telLoja = cfg.telefone_loja || "";
+        }
+    } catch(e) {}
+
+    // --- MONTAGEM DO TEXTO (MODO COMANDA) ---
     let txt = "";
-    txt += `${nomeLoja}\n`;
-    if (telLoja) txt += `TEL: ${telLoja}\n`;
-    txt += `PEDIDO #${pedido.id}\n`;
+    
+    // CABEÇALHO CENTRALIZADO
+    txt += `${centralizar(nomeLoja)}\n`;
+    if (telLoja) txt += `${centralizar("TEL: " + telLoja)}\n`;
+    txt += `${centralizar("PEDIDO #" + pedido.id)}\n`;
+    
     txt += `${divisor}\n`;
     txt += `DATA: ${new Date(pedido.created_at).toLocaleDateString('pt-BR')} ${new Date(pedido.created_at).toLocaleTimeString('pt-BR')}\n`;
     txt += `CLIENTE: ${removerAcentos(pedido.cliente_nome || 'NAO INFORMADO')}\n`;
@@ -1059,7 +1066,6 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
         let precoItem = `R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}`;
         txt += formatarLinhaDupla(nomeItem, precoItem) + "\n";
         
-        // Observações do item
         if (i.sabor) txt += ` OBS: ${removerAcentos(i.sabor)}\n`;
         if (i.detalhes) txt += ` OBS: ${removerAcentos(i.detalhes)}\n`;
         if (i.adicionais?.length > 0) txt += ` ADD: ${removerAcentos(i.adicionais.map(a=>a.nome).join(','))}\n`;
@@ -1071,20 +1077,19 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     }
     txt += formatarLinhaDupla("TOTAL:", `R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}`) + "\n";
     txt += `${divisor}\n`;
-    txt += `\nOBRIGADO PELA PREFERENCIA!\n\n\n`; // Espaços extras para o corte do papel
+    txt += `\n${centralizar("OBRIGADO PELA PREFERENCIA!")}\n\n\n`;
 
-    // --- ENVIO PARA A IMPRESSORA ---
+    // --- ENVIO ---
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
-        // Envia o texto puro formatado por espaços, sem HTML nenhum
         const base64 = btoa(unescape(encodeURIComponent(txt)));
         window.location.href = "rawbt:base64," + base64;
     } else {
-        // No Windows/PC, continua usando o HTML para manter o estilo visual
+        // No PC, usamos <pre> para manter os espaços e o alinhamento
         const area = document.getElementById('area-impressao-termica');
         if (area) {
-            area.innerHTML = `<pre style="font-family:monospace; font-size:12px;">${txt}</pre>`;
+            area.innerHTML = `<pre style="font-family:monospace; font-size:12px; margin:0; padding:10px; width:220px; background:white;">${txt}</pre>`;
             area.style.display = 'block';
             window.print();
             setTimeout(() => { area.style.display = 'none'; }, 500);
