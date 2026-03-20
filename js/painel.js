@@ -1023,7 +1023,6 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
 
     const COLUNAS = 32; 
 
-    // Função de quebra de linha que respeita o limite de colunas
     const quebrarTexto = (texto, limite, recuo = 0) => {
         let palavras = removerAcentos(texto).split(' ');
         let linhas = [];
@@ -1077,13 +1076,20 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     txt += `DATA: ${new Date(pedido.created_at).toLocaleString('pt-BR')}\n`;
     txt += `CLIENTE: ${quebrarTexto(pedido.cliente_nome || 'NÃO INFORMADO', 23, 9)}\n`;
     
-    // Endereço com tratamento especial: Rua em cima, Cidade embaixo
-    let partesEnd = (pedido.endereco || 'RETIRADA').split('|');
-    let rua = partesEnd[0].trim();
-    let cidade = partesEnd[1] ? partesEnd[1].trim() : "";
+    // --- ENDEREÇO (DIVISÃO INTELIGENTE POR HÍFEN) ---
+    let enderecoCompleto = (pedido.endereco || 'RETIRADA').split('|')[0].trim();
+    let rua = enderecoCompleto;
+    let bairroCidade = "";
+    
+    // Separa a partir do último "-" (ex: Rua X, 148 - Bairro, Cidade)
+    let ultimoTraco = enderecoCompleto.lastIndexOf('-');
+    if (ultimoTraco !== -1) {
+        rua = enderecoCompleto.substring(0, ultimoTraco).trim();
+        bairroCidade = enderecoCompleto.substring(ultimoTraco + 1).trim();
+    }
 
     txt += `END.: ${quebrarTexto(rua, 26, 6)}\n`;
-    if (cidade) txt += `${quebrarTexto(cidade, COLUNAS)}\n`;
+    if (bairroCidade) txt += `      ${quebrarTexto(bairroCidade, 26, 6)}\n`;
     
     txt += `PAGTO: ${removerAcentos(pedido.forma_pagamento || 'A COMBINAR')}\n`;
     txt += `${divisor}\n`;
@@ -1094,17 +1100,28 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
         let precoTotalItem = `R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}`;
         txt += formatarLinhaDupla(nomeItem, precoTotalItem) + "\n";
         
-        // Regra do SABOR (Obrigatório/Principal)
-        if (i.sabor) {
-            txt += `  SABOR: ${quebrarTexto(i.sabor, 23, 9)}\n`;
-        }
-
-        // Regra da OBSERVAÇÃO (Adicionais, Removidos ou Detalhes)
+        let saborReal = i.sabor ? removerAcentos(i.sabor) : "";
         let obsTexto = "";
         let complementos = [];
+
+        // Filtro: Se o sistema salvou a palavra "SABOR:" dentro das observações/detalhes
+        if (i.detalhes) {
+            let det = removerAcentos(i.detalhes);
+            if (det.includes("SABOR:")) {
+                saborReal = det; // Move para a variável de Sabor
+            } else {
+                complementos.push(det); // Mantém como Observação extra
+            }
+        }
+
+        // Garante que só fique o nome do sabor, removendo lixos e prefixos
+        if (saborReal) {
+            saborReal = saborReal.replace(/OBS:\s*/g, '').replace(/SABOR:\s*/g, '').trim();
+            txt += `  SABOR: ${quebrarTexto(saborReal, 23, 9)}\n`;
+        }
+
         if (i.adicionais?.length) complementos.push("ADD: " + i.adicionais.map(a => a.nome).join(', '));
         if (i.removidos?.length) complementos.push("SEM: " + i.removidos.join(', '));
-        if (i.detalhes) complementos.push(i.detalhes);
 
         if (complementos.length > 0) {
             obsTexto = complementos.join(' | ');
@@ -1126,7 +1143,6 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     } else {
         const area = document.getElementById('area-impressao-termica');
         if (area) {
-            // No PC usamos BOLD máximo para que a térmica queime o papel com mais força
             area.innerHTML = `<pre style="font-family:monospace; font-size:12px; font-weight:900; color:black; line-height:1.2;">${txt}</pre>`;
             area.style.display = 'block';
             window.print();
