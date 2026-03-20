@@ -1007,152 +1007,87 @@ window.removerImagemProd = function(idx) {
    ============================================================= */
 window.imprimirPedidoMaster = async function(pedidoOuId) {
     let pedido;
-
     if (typeof pedidoOuId === 'string' || typeof pedidoOuId === 'number') {
         pedido = PEDIDOS_LISTA.find(p => p.id == pedidoOuId);
-    } else {
-        pedido = pedidoOuId;
-    }
+    } else { pedido = pedidoOuId; }
 
-    if (!pedido) return alert("Erro: Pedido não encontrado para impressão.");
+    if (!pedido) return alert("Erro: Pedido não encontrado.");
 
-    // --- FUNÇÃO AUXILIAR PARA CORRIGIR ACENTOS ---
-    const limparTexto = (txt) => {
-        if (!txt) return '';
-        return txt.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    // Função interna para limpar acentos (vital para o RawBT não bugar)
+    const removerAcentos = (str) => {
+        return str.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/ç/gi, 'c').toUpperCase();
     };
 
-    // BUSCA OS DADOS DA LOJA
-    let nomeDaLoja = 'MY-DELIVERY';
-    let telefoneDaLoja = '';
+    // --- DADOS DA LOJA ---
+    let nomeLoja = "MY DELIVERY";
+    let telLoja = "";
     try {
         const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
         if (cfg) {
-            if (cfg.nome_loja) nomeDaLoja = limparTexto(cfg.nome_loja);
-            if (cfg.telefone_loja) {
-                let tLoja = cfg.telefone_loja.replace(/\D/g, '');
-                if (tLoja.startsWith('55') && tLoja.length >= 12) tLoja = tLoja.slice(2);
-                if (tLoja.length === 11) telefoneDaLoja = `(${tLoja.slice(0,2)}) ${tLoja.slice(2,3)} ${tLoja.slice(3,7)}-${tLoja.slice(7)}`;
-                else if (tLoja.length === 10) telefoneDaLoja = `(${tLoja.slice(0,2)}) ${tLoja.slice(2,6)}-${tLoja.slice(6)}`;
-                else telefoneDaLoja = cfg.telefone_loja;
-            }
+            nomeLoja = removerAcentos(cfg.nome_loja || nomeLoja);
+            telLoja = cfg.telefone_loja || "";
         }
-    } catch(e) { console.error("Aviso: Imprimindo com nome padrão."); }
+    } catch(e) {}
 
-    const config = JSON.parse(localStorage.getItem('ticketConfig')) || { width: '58mm', footer: 'Obrigado pela preferência!' };
-    const maxLargura = config.width === '80mm' ? '280px' : '210px'; // Ajuste fino para não cortar a lateral
-    const fontSize = config.width === '80mm' ? '14px' : '12px';
+    // --- CONFIGURAÇÃO DE COLUNAS (58mm = 32 colunas padrão) ---
+    const COLUNAS = 32; 
 
-    let enderecoLimpo = limparTexto((pedido.endereco || '-').split(' | ')[0]);
-    let formaPgto = limparTexto(pedido.forma_pagamento || pedido.pagamento || '-');
-    let referencia = limparTexto(pedido.referencia || pedido.ponto_referencia || '-');
-    
-    // Formata o Telefone do Cliente
-    let telFormatado = pedido.cliente_tel || 'Nao informado';
-    if (telFormatado !== 'Nao informado') {
-        let t = telFormatado.replace(/\D/g, '');
-        if (t.startsWith('55') && t.length >= 12) t = t.slice(2);
-        if (t.length === 11) telFormatado = `(${t.slice(0,2)}) ${t.slice(2,3)} ${t.slice(3,7)}-${t.slice(7)}`;
-        else if (t.length === 10) telFormatado = `(${t.slice(0,2)}) ${t.slice(2,6)}-${t.slice(6)}`;
+    // Função para alinhar ESQUERDA e DIREITA na mesma linha (Ex: Item .... R$ 10)
+    const formatarLinhaDupla = (esq, dir) => {
+        let textoEsq = esq.substring(0, COLUNAS - dir.length - 1); // Corta se for muito longo
+        let espacos = COLUNAS - (textoEsq.length + dir.length);
+        return textoEsq + " ".repeat(Math.max(1, espacos)) + dir;
+    };
+
+    const divisor = "-".repeat(COLUNAS);
+
+    // --- MONTAGEM DO TEXTO PARA ANDROID (RAWBT) ---
+    let txt = "";
+    txt += `${nomeLoja}\n`;
+    if (telLoja) txt += `TEL: ${telLoja}\n`;
+    txt += `PEDIDO #${pedido.id}\n`;
+    txt += `${divisor}\n`;
+    txt += `DATA: ${new Date(pedido.created_at).toLocaleDateString('pt-BR')} ${new Date(pedido.created_at).toLocaleTimeString('pt-BR')}\n`;
+    txt += `CLIENTE: ${removerAcentos(pedido.cliente_nome || 'NAO INFORMADO')}\n`;
+    txt += `END: ${removerAcentos(pedido.endereco || 'RETIRADA').split('|')[0].trim()}\n`;
+    txt += `PAGTO: ${removerAcentos(pedido.forma_pagamento || 'A COMBINAR')}\n`;
+    txt += `${divisor}\n`;
+    txt += `ITENS DO PEDIDO:\n\n`;
+
+    pedido.itens.forEach(i => {
+        let nomeItem = `${i.qtd}X ${removerAcentos(i.nome)}`;
+        let precoItem = `R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}`;
+        txt += formatarLinhaDupla(nomeItem, precoItem) + "\n";
+        
+        // Observações do item
+        if (i.sabor) txt += ` OBS: ${removerAcentos(i.sabor)}\n`;
+        if (i.detalhes) txt += ` OBS: ${removerAcentos(i.detalhes)}\n`;
+        if (i.adicionais?.length > 0) txt += ` ADD: ${removerAcentos(i.adicionais.map(a=>a.nome).join(','))}\n`;
+    });
+
+    txt += `${divisor}\n`;
+    if (pedido.taxa_entrega > 0) {
+        txt += formatarLinhaDupla("TAXA ENTREGA:", `R$ ${parseFloat(pedido.taxa_entrega).toFixed(2).replace('.', ',')}`) + "\n";
     }
+    txt += formatarLinhaDupla("TOTAL:", `R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}`) + "\n";
+    txt += `${divisor}\n`;
+    txt += `\nOBRIGADO PELA PREFERENCIA!\n\n\n`; // Espaços extras para o corte do papel
 
-    const linhaTracejada = `<div style="border-bottom: 1px dashed #000; margin: 5px 0; width: 100%;"></div>`;
-
-    const itensHtml = pedido.itens.map(i => {
-        let extrasHTML = "";
-        if (i.sabor) extrasHTML += `<div>OBS: SABOR: ${limparTexto(i.sabor)}</div>`;
-        if (i.adicionais && i.adicionais.length > 0) extrasHTML += `<div>OBS: ADD: ${limparTexto(i.adicionais.map(a=>a.nome).join(', '))}</div>`;
-        if (i.removidos && i.removidos.length > 0) extrasHTML += `<div>OBS: SEM: ${limparTexto(i.removidos.join(', '))}</div>`;
-        if (!extrasHTML && i.detalhes) extrasHTML += `<div>OBS: ${limparTexto(i.detalhes)}</div>`;
-
-        return `
-            <div style="margin-bottom: 6px; width: 100%;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="flex: 1;">${i.qtd}x ${limparTexto(i.nome)}</span>
-                    <span style="white-space: nowrap;">R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}</span>
-                </div>
-                <div style="font-size: 0.9em; margin-left: 5px;">${extrasHTML}</div>
-            </div>
-        `;
-    }).join('');
-
-    let taxaEntregaHtml = '';
-    if (pedido.taxa_entrega && parseFloat(pedido.taxa_entrega) > 0) {
-        taxaEntregaHtml = `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                <span>TAXA ENTREGA:</span>
-                <span>R$ ${parseFloat(pedido.taxa_entrega).toFixed(2).replace('.', ',')}</span>
-            </div>
-        `;
-    }
-
-    const htmlTelefoneLoja = telefoneDaLoja ? `<div style="text-align: center; margin-bottom: 4px;">TEL: ${telefoneDaLoja}</div>` : '';
-
-    const cupomHTML = `
-        <div style="width: ${maxLargura}; padding: 0 2mm; font-family: 'Courier New', Courier, monospace; font-size: ${fontSize}; color: #000; font-weight: bold; line-height: 1.3;">
-            
-            <div style="text-align: center; font-size: 1.3em;">${nomeDaLoja}</div>
-            ${htmlTelefoneLoja}
-            <div style="text-align: center; font-size: 1.1em;">PEDIDO #${pedido.id.toString()}</div>
-            
-            ${linhaTracejada}
-            
-            <div>HORA: ${new Date(pedido.created_at).toLocaleString('pt-BR')}</div>
-            <div>CLIENTE: ${limparTexto(pedido.cliente_nome) || 'NAO INFORMADO'}</div>
-            <div>TELEFONE: ${telFormatado}</div>
-            <div style="word-wrap: break-word;">ENDERECO: ${enderecoLimpo}</div>
-            <div>PAGAMENTO: ${formaPgto}</div>
-            <div style="word-wrap: break-word;">REFERENCIA: ${referencia}</div>
-            
-            ${linhaTracejada}
-            
-            <div style="margin-bottom: 8px;">ITENS DO PEDIDO:</div>
-            
-            ${itensHtml}
-            
-            ${linhaTracejada}
-            
-            ${taxaEntregaHtml}
-            
-            <div style="display: flex; justify-content: space-between; font-size: 1.3em;">
-                <span>TOTAL:</span>
-                <span>R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}</span>
-            </div>
-            
-            ${linhaTracejada}
-            
-            <div style="text-align: center; margin-top: 10px;">
-                ${limparTexto(config.footer)}
-            </div>
-        </div>
-    `;
-
+    // --- ENVIO PARA A IMPRESSORA ---
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
-        // No Android, removemos as tags HTML para enviar texto puro para a RawBT
-        let textoPuro = cupomHTML
-            .replace(/<div[^>]*style="[^"]*border-bottom:[^"]*"[^>]*><\/div>/gi, '\n--------------------------------\n')
-            .replace(/<\/div>/gi, '\n')
-            .replace(/<span[^>]*>/gi, '')
-            .replace(/<\/span>/gi, ' ')
-            .replace(/<[^>]*>/g, '') 
-            .replace(/\n\s*\n/g, '\n') 
-            .trim();
-            
-        const base64 = btoa(unescape(encodeURIComponent(textoPuro)));
+        // Envia o texto puro formatado por espaços, sem HTML nenhum
+        const base64 = btoa(unescape(encodeURIComponent(txt)));
         window.location.href = "rawbt:base64," + base64;
     } else {
+        // No Windows/PC, continua usando o HTML para manter o estilo visual
         const area = document.getElementById('area-impressao-termica');
-        if (!area) return alert("Erro: Div de impressao nao encontrada.");
-        
-        area.innerHTML = cupomHTML;
-        area.style.display = 'block';
-        
-        // Pequeno delay para garantir que o estilo CSS seja aplicado antes de abrir o print
-        setTimeout(() => { 
-            window.print(); 
-            area.style.display = 'none';
-        }, 300);
+        if (area) {
+            area.innerHTML = `<pre style="font-family:monospace; font-size:12px;">${txt}</pre>`;
+            area.style.display = 'block';
+            window.print();
+            setTimeout(() => { area.style.display = 'none'; }, 500);
+        }
     }
 }
