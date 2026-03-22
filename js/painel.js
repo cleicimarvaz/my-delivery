@@ -1135,18 +1135,43 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     txt += `${divisor}\n\n`;
     txt += `${centralizar("OBRIGADO PELA PREFERENCIA!")}\n\n\n`;
 
+    // --- DETECÇÃO DE DISPOSITIVO E IMPRESSÃO ---
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
+        // Android via RawBT
         const base64 = btoa(unescape(encodeURIComponent(txt)));
         window.location.href = "rawbt:base64," + base64;
     } else {
+        // iOS (Open Label / AirPrint) e PC
         const area = document.getElementById('area-impressao-termica');
         if (area) {
-            area.innerHTML = `<pre style="font-family:monospace; font-size:12px; font-weight:900; color:black; line-height:1.2;">${txt}</pre>`;
+            // Injetamos um estilo exclusivo para forçar o Safari/iOS a usar 58mm e fundo branco
+            area.innerHTML = `
+                <style>
+                    @media print {
+                        @page {
+                            margin: 0 !important;
+                            size: 58mm auto !important; /* O segredo para o iOS não gerar um PDF tamanho A4 */
+                        }
+                        body, html {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            background: #FFFFFF !important; /* Mata o fundo preto do Open Label */
+                        }
+                    }
+                </style>
+                <div style="width: 58mm; max-width: 58mm; background-color: #FFFFFF !important; margin: 0; padding: 0;">
+                    <pre style="font-family: monospace; font-size: 11px; font-weight: 900; color: #000000; line-height: 1.2; padding: 2mm 0; margin: 0; white-space: pre-wrap; background-color: #FFFFFF !important;">${txt}</pre>
+                </div>
+            `;
             area.style.display = 'block';
-            window.print();
-            setTimeout(() => { area.style.display = 'none'; }, 500);
+            
+            // Um pequeno atraso (300ms) para garantir que o iOS leia a tag <style> antes de abrir a tela
+            setTimeout(() => { 
+                window.print(); 
+                area.style.display = 'none'; 
+            }, 300);
         }
     }
 }
