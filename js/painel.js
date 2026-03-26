@@ -172,26 +172,80 @@ window.abrirConfigEspecifica = async function(tipo) {
             if (data.banner_url) document.getElementById('preview-banner-loja').innerHTML = `<img src="${data.banner_url}" class="w-full h-full object-cover">`;
             if (document.getElementById('cfg-nome-loja')) document.getElementById('cfg-nome-loja').value = data.nome_loja || '';
             if (document.getElementById('cfg-tel-loja')) document.getElementById('cfg-tel-loja').value = data.telefone_loja || '';
+            
+            // --- CARREGA OS DADOS DO PIX ---
+            if (document.getElementById('cfg-chave-pix')) document.getElementById('cfg-chave-pix').value = data.chave_pix || '';
+            if (data.qr_code_pix) {
+                document.getElementById('preview-qrcode-loja').innerHTML = `<img src="${data.qr_code_pix}" class="w-full h-full object-cover p-1">`;
+            } else {
+                document.getElementById('preview-qrcode-loja').innerHTML = `<i class="ph-bold ph-qr-code text-2xl text-slate-300"></i>`;
+            }
         }
     }
 }
 
-// NOVA FUNÇÃO PARA SALVAR OS DADOS DA LOJA
 window.salvarDadosLoja = async function() {
     const nome = document.getElementById('cfg-nome-loja').value.trim();
     const tel = document.getElementById('cfg-tel-loja').value.trim();
     
-    await _supabase.from('configuracoes').update({ nome_loja: nome, telefone_loja: tel }).eq('id', 1);
+    // Tenta pegar o valor da chave PIX
+    const inputPix = document.getElementById('cfg-chave-pix');
+    const chavePix = inputPix ? inputPix.value.trim() : ''; 
     
-    NOME_LOJA = nome || 'MY-DELIVERY'; // Atualiza imediatamente na memória
-    await window.registrarAuditoria("CONFIGURAÇÃO", "Alterou os dados cadastrais da loja");
-    window.sysAlert('Sucesso!', 'Os dados da loja foram atualizados com sucesso.', 'sucesso');
+    // Manda pro Supabase
+    const { error } = await _supabase.from('configuracoes').update({ 
+        nome_loja: nome, 
+        telefone_loja: tel,
+        chave_pix: chavePix 
+    }).eq('id', 1);
+    
+    if (error) {
+        console.error("Erro do Supabase:", error);
+        return window.sysAlert('Erro ao Salvar', 'Falha ao comunicar com o banco de dados.', 'erro');
+    }
+    
+    NOME_LOJA = nome || 'MY-DELIVERY';
+    await window.registrarAuditoria("CONFIGURAÇÃO", "Alterou os dados cadastrais da loja e PIX");
+    window.sysAlert('Sucesso!', 'Os dados da loja e a Chave PIX foram atualizados com sucesso.', 'sucesso');
 }
 
-window.voltarMenuConfig = function() { 
-    document.querySelectorAll('[id^="view-cfg-"]').forEach(el => el.classList.add('hidden')); 
-    document.getElementById('menu-config-cards').classList.remove('hidden'); 
+// --- NOVAS FUNÇÕES DE UPLOAD DO QR CODE ---
+window.uploadQrCodePix = async function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    window.sysAlert('Aguarde...', 'Enviando a imagem do QR Code...', 'info');
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `qrcode_${Date.now()}.${fileExt}`;
+    const filePath = `loja/${fileName}`;
+
+    const { error } = await _supabase.storage.from('imagens').upload(filePath, file);
+
+    if (error) {
+        window.fecharAlerta();
+        return window.sysAlert('Erro', 'Falha ao enviar o QR Code.', 'erro');
+    }
+
+    const { data: publicUrlData } = _supabase.storage.from('imagens').getPublicUrl(filePath);
+    const qrUrl = publicUrlData.publicUrl;
+
+    await _supabase.from('configuracoes').update({ qr_code_pix: qrUrl }).eq('id', 1);
+    
+    document.getElementById('preview-qrcode-loja').innerHTML = `<img src="${qrUrl}" class="w-full h-full object-cover p-1">`;
+    
+    window.sysAlert('Sucesso!', 'Seu QR Code do Pix foi salvo e já está ativo para os clientes!', 'sucesso');
+    event.target.value = ''; // Limpa o input
 }
+
+window.removerQrCodePix = async function() {
+    if(await window.sysConfirm('Remover Imagem', 'Deseja apagar o QR Code do PIX do sistema?')) {
+        await _supabase.from('configuracoes').update({ qr_code_pix: null }).eq('id', 1);
+        document.getElementById('preview-qrcode-loja').innerHTML = `<i class="ph-bold ph-qr-code text-2xl text-slate-300"></i>`;
+        window.sysAlert('Removido', 'A imagem do QR Code foi removida.', 'sucesso');
+    }
+}
+
 
 /* =============================================================
    MÓDULO: PRODUTOS E CARDÁPIO
@@ -611,10 +665,81 @@ window.processarBackup = function(event) {
 };
 
 window.gerarRelatorioFinanceiro = async function() { 
-    const i = document.getElementById('data-inicio-rel').value, f = document.getElementById('data-fim-rel').value; 
-    const { data } = await _supabase.from('pedidos').select('total').gte('created_at',i).lte('created_at',f+'T23:59:59').eq('status','Entregue'); 
-    const total = (data||[]).reduce((a,b)=>a+b.total,0); 
-    document.getElementById('conteudo-rel-financeiro').innerHTML = `<div class="bg-emerald-50 p-6 rounded-[2rem] text-center border border-emerald-100 shadow-sm"><p class="text-[10px] font-black uppercase text-emerald-500 mb-1">Total Faturado</p><h3 class="text-4xl font-black text-emerald-600 italic">R$ ${total.toFixed(2)}</h3></div>`; 
+    const i = document.getElementById('data-inicio-rel').value;
+    const f = document.getElementById('data-fim-rel').value; 
+
+    if (!i || !f) return window.sysAlert("Atenção", "Selecione as datas para a consulta.", "erro");
+
+    // Buscamos os dados no Supabase
+    const { data, error } = await _supabase
+        .from('pedidos')
+        .select('*') // Buscamos tudo para preencher a lista também
+        .gte('created_at', i)
+        .lte('created_at', f + 'T23:59:59')
+        .eq('status', 'Entregue')
+        .order('created_at', { ascending: false });
+
+    if (error) return window.sysAlert("Erro", "Falha ao carregar dados.", "erro");
+
+    const pedidos = data || [];
+    let totalGeral = 0, totalTaxas = 0, totalPix = 0, totalOutros = 0;
+
+    pedidos.forEach(p => {
+        totalGeral += p.total;
+        totalTaxas += p.taxa_entrega || 0;
+        if (p.forma_pagamento === 'PIX') totalPix += p.total;
+        else totalOutros += p.total;
+    });
+
+    const totalProdutos = totalGeral - totalTaxas;
+
+    // --- PARTE 1: RESUMO FINANCEIRO (Coluna da Esquerda) ---
+    document.getElementById('conteudo-rel-financeiro').innerHTML = `
+        <div class="space-y-4 animate-pop">
+            <div class="bg-emerald-500 p-6 rounded-3xl text-center shadow-lg shadow-emerald-100">
+                <p class="text-[9px] font-black uppercase text-emerald-100 mb-1 tracking-widest">Total Faturado</p>
+                <h3 class="text-3xl font-black text-white italic">R$ ${totalGeral.toFixed(2).replace('.', ',')}</h3>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p class="text-[8px] font-black text-slate-400 uppercase mb-1">💠 Pix</p>
+                    <p class="text-sm font-black text-slate-700 italic">R$ ${totalPix.toFixed(2).replace('.', ',')}</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p class="text-[8px] font-black text-slate-400 uppercase mb-1">💵 Outros</p>
+                    <p class="text-sm font-black text-slate-700 italic">R$ ${totalOutros.toFixed(2).replace('.', ',')}</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p class="text-[8px] font-black text-slate-400 uppercase mb-1">🍟 Produtos</p>
+                    <p class="text-sm font-black text-slate-700 italic">R$ ${totalProdutos.toFixed(2).replace('.', ',')}</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p class="text-[8px] font-black text-slate-400 uppercase mb-1">🛵 Entregas</p>
+                    <p class="text-sm font-black text-emerald-600 italic">R$ ${totalTaxas.toFixed(2).replace('.', ',')}</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // --- PARTE 2: HISTÓRICO RECENTE (Coluna da Direita) ---
+    const listaHistorico = document.getElementById('lista-vendas-estorno');
+    if (pedidos.length === 0) {
+        listaHistorico.innerHTML = `<div class="text-center py-10 opacity-30 italic text-xs uppercase font-black">Nenhum registro</div>`;
+    } else {
+        listaHistorico.innerHTML = pedidos.map(p => `
+            <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 transition-all">
+                <div>
+                    <p class="text-[10px] font-black text-slate-800 uppercase italic leading-tight mb-1">#${p.id} - ${p.cliente_nome}</p>
+                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">${new Date(p.created_at).toLocaleDateString()} - ${p.forma_pagamento}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs font-black text-emerald-600 italic">R$ ${p.total.toFixed(2)}</p>
+                    <button onclick="window.confirmarEstorno(${p.id})" class="text-[7px] font-black text-red-400 uppercase hover:text-red-600 transition-colors tracking-widest">Estornar</button>
+                </div>
+            </div>
+        `).join('');
+    }
 }
 
 /* HISTÓRICO DE VENDAS E ESTORNO (CORRIGIDO BUG DO MAP) */
@@ -624,21 +749,24 @@ window.carregarHistoricoEstorno = async function() {
     
     if(container) {
         container.innerHTML = (data||[]).map(p => `
-        <div class="bg-white p-4 rounded-2xl mb-2 shadow-sm border border-slate-100">
-            <div class="flex justify-between items-center mb-3">
-                <div>
-                    <span class="text-[9px] font-black text-slate-400 block">Pedido #${p.id}</span>
-                    <span class="text-xs font-black text-slate-700">${p.cliente_nome}</span>
+        <div class="bg-white p-5 rounded-[2rem] mb-3 shadow-sm border border-slate-100 animate-pop">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex-1 pr-2">
+                    <span class="text-[9px] font-black text-slate-400 block mb-1">Pedido #${p.id}</span>
+                    <h4 class="text-xs font-black text-slate-700 uppercase italic leading-tight">${p.cliente_nome}</h4>
+                    <p class="text-[8px] font-bold text-slate-400 uppercase mt-1">${new Date(p.created_at).toLocaleDateString()} - ${p.forma_pagamento}</p>
                 </div>
-                <span class="text-xs font-black text-emerald-500">R$ ${p.total.toFixed(2)}</span>
+                <div class="text-right shrink-0">
+                    <span class="text-xs font-black text-emerald-500 italic">R$ ${p.total.toFixed(2).replace('.', ',')}</span>
+                </div>
             </div>
             
             <div class="flex gap-2">
-                <button onclick='window.imprimirPedidoMaster(${JSON.stringify(p)})' class="flex-1 bg-blue-50 text-blue-600 py-2 rounded-xl text-[10px] font-black uppercase border border-blue-100 flex items-center justify-center gap-2">
+                <button onclick='window.imprimirPedidoMaster(${JSON.stringify(p)})' class="flex-1 bg-blue-50 text-blue-600 py-3 rounded-xl text-[9px] font-black uppercase border border-blue-100 flex items-center justify-center gap-2 active:scale-95 transition-all">
                     <i class="ph-bold ph-printer"></i> Imprimir
                 </button>
                 
-                <button onclick="window.estornar(${p.id})" class="flex-1 bg-red-50 text-red-500 py-2 rounded-xl text-[10px] font-black uppercase border border-red-100">
+                <button onclick="window.estornarPedido(${p.id})" class="flex-1 bg-red-50 text-red-500 py-3 rounded-xl text-[9px] font-black uppercase border border-red-100 active:scale-95 transition-all">
                     Estornar
                 </button>
             </div>
@@ -646,13 +774,39 @@ window.carregarHistoricoEstorno = async function() {
     }
 }
 
-window.estornar = async function(id) { 
-    if(await window.sysConfirm('Estornar', 'Cancelar venda?')) { 
-        await _supabase.from('pedidos').update({status:'Cancelado'}).eq('id',id); 
-        await window.registrarAuditoria("ESTORNO", `Cancelou/Estornou o pedido #${id}`);
-        window.carregarHistoricoEstorno(); 
-        window.sysAlert('Sucesso', 'Venda estornada.', 'sucesso'); 
-    } 
+// FUNÇÃO PARA EXECUTAR O ESTORNO
+window.estornarPedido = async function(id) {
+    const confirmar = confirm(`Tem certeza que deseja ESTORNAR o pedido #${id}?\n\nIsso mudará o status para 'Cancelado' e ele sairá dos relatórios de venda.`);
+    
+    if (confirmar) {
+        const { error } = await _supabase
+            .from('pedidos')
+            .update({ status: 'Cancelado' })
+            .eq('id', id);
+
+        if (error) {
+            return window.sysAlert("Erro", "Não foi possível estornar o pedido.", "erro");
+        }
+
+        window.sysAlert("Sucesso!", `Pedido #${id} estornado com sucesso.`, "sucesso");
+        
+        // Atualiza a lista e o relatório financeiro automaticamente
+        window.carregarHistoricoEstorno();
+        if (typeof window.gerarRelatorioFinanceiro === 'function') {
+            window.gerarRelatorioFinanceiro();
+        }
+    }
+}
+
+window.confirmarEstorno = async function(id) {
+    if (!confirm(`Deseja realmente estornar o pedido #${id}? O status voltará para Cancelado.`)) return;
+    
+    const { error } = await _supabase.from('pedidos').update({ status: 'Cancelado' }).eq('id', id);
+    
+    if (error) return window.sysAlert("Erro", "Não foi possível estornar.", "erro");
+    
+    window.sysAlert("Sucesso", "Venda estornada com sucesso!", "sucesso");
+    window.gerarRelatorioFinanceiro(); // Atualiza o relatório na hora
 }
 
 window.salvarConfigTicket = async function() { 

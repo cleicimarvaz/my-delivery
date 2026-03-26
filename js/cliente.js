@@ -750,7 +750,9 @@ window.enviarPedido = async function() {
             sabor: i.sabor || ""
         })), 
         total: vtFinalComFrete, 
-        status: 'Pendente',
+        // --- AQUI ESTÁ A MÁGICA DO STATUS ---
+        status: fp.toUpperCase() === 'PIX' ? 'Aguardando PIX' : 'Pendente',
+        // ------------------------------------
         created_at: new Date().toISOString()
     };
     
@@ -768,15 +770,19 @@ window.enviarPedido = async function() {
         
         MEUS_PEDIDOS_IDS.push(data.id);
         
-        document.getElementById('sucesso-pedido-id').innerText = `Pedido #${data.id}`;
-        document.getElementById('sucesso-endereco').innerText = `${CLIENTE_LOGADO.rua}, ${CLIENTE_LOGADO.num}`;
-        document.getElementById('sucesso-pgto').innerText = fp.toUpperCase();
-        document.getElementById('sucesso-total').innerText = `R$ ${vtFinalComFrete.toFixed(2).replace('.', ',')}`;
-        
-        const modS = document.getElementById('modal-pedido-sucesso');
-        if (modS) {
-            modS.classList.remove('hidden'); 
-            modS.style.setProperty('display', 'flex', 'important');
+        if (fp.toUpperCase() === 'PIX') {
+            window.abrirModalPix(data.id, vtFinalComFrete);
+        } else {
+            document.getElementById('sucesso-pedido-id').innerText = `Pedido #${data.id}`;
+            document.getElementById('sucesso-endereco').innerText = `${CLIENTE_LOGADO.rua}, ${CLIENTE_LOGADO.num}`;
+            document.getElementById('sucesso-pgto').innerText = fp.toUpperCase();
+            document.getElementById('sucesso-total').innerText = `R$ ${vtFinalComFrete.toFixed(2).replace('.', ',')}`;
+            
+            const modS = document.getElementById('modal-pedido-sucesso');
+            if (modS) {
+                modS.classList.remove('hidden'); 
+                modS.style.setProperty('display', 'flex', 'important');
+            }
         }
         
         window.verificarPedidosAtivos();
@@ -824,24 +830,47 @@ window.filtrarHistorico = function(tipo) {
 
 window.renderizarListaPedidos = function() {
     const container = document.getElementById('lista-meus-pedidos');
-    const pFiltrados = FILTRO_HISTORICO_ATUAL === 'andamento' ? HISTORICO_PEDIDOS_CLIENTE.filter(p => ['Pendente', 'Em Preparo', 'Em Rota'].includes(p.status)) : HISTORICO_PEDIDOS_CLIENTE.filter(p => ['Entregue', 'Cancelado'].includes(p.status));
     
-    if (pFiltrados.length === 0) { container.innerHTML = `<div class="text-center py-20 opacity-40 italic"><p class="text-xs font-black uppercase tracking-widest">Nada por aqui</p></div>`; return; }
+    // ADICIONADO 'Aguardando PIX' no filtro de pedidos em andamento
+    const pFiltrados = FILTRO_HISTORICO_ATUAL === 'andamento' 
+        ? HISTORICO_PEDIDOS_CLIENTE.filter(p => ['Aguardando PIX', 'Pendente', 'Em Preparo', 'Em Rota'].includes(p.status)) 
+        : HISTORICO_PEDIDOS_CLIENTE.filter(p => ['Entregue', 'Cancelado'].includes(p.status));
+    
+    if (pFiltrados.length === 0) { 
+        container.innerHTML = `<div class="text-center py-20 opacity-40 italic"><p class="text-xs font-black uppercase tracking-widest">Nada por aqui</p></div>`; 
+        return; 
+    }
     
     container.innerHTML = pFiltrados.map(pedido => {
         const pagStr = pedido.forma_pagamento || (pedido.endereco.split('PGTO: ')[1] || '---');
-        const cores = { 'Pendente': 'bg-slate-800 text-white', 'Em Preparo': 'bg-orange-500 text-white', 'Em Rota': 'bg-blue-500 text-white', 'Entregue': 'bg-emerald-500 text-white', 'Cancelado': 'bg-red-500 text-white' };
+        
+        // ADICIONADA a cor amarela para o status 'Aguardando PIX'
+        const cores = { 
+            'Aguardando PIX': 'bg-yellow-500 text-white',
+            'Pendente': 'bg-slate-800 text-white', 
+            'Em Preparo': 'bg-orange-500 text-white', 
+            'Em Rota': 'bg-blue-500 text-white', 
+            'Entregue': 'bg-emerald-500 text-white', 
+            'Cancelado': 'bg-red-500 text-white' 
+        };
         
         return `
         <div onclick="window.abrirHistoricoPedido(${pedido.id}, '${pedido.status}', '${pedido.created_at}')" class="bg-slate-50 p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4 animate-pop cursor-pointer hover:border-blue-200 group">
-            <div class="flex justify-between items-center"><span class="text-[10px] font-black text-slate-400 uppercase italic">Pedido #${pedido.id}</span><span class="text-[9px] font-black uppercase px-3 py-1 rounded-full ${cores[pedido.status]}">${pedido.status}</span></div>
-            <div class="space-y-2">${pedido.itens.map(i => `<div class="text-[11px] font-bold text-slate-600 leading-snug"><span class="text-slate-800 font-black">${i.qtd}x</span> ${i.nome}</div>`).join('')}</div>
+            <div class="flex justify-between items-center">
+                <span class="text-[10px] font-black text-slate-400 uppercase italic">Pedido #${pedido.id}</span>
+                <span class="text-[9px] font-black uppercase px-3 py-1 rounded-full ${cores[pedido.status] || 'bg-slate-400 text-white'}">${pedido.status}</span>
+            </div>
+            <div class="space-y-2">
+                ${pedido.itens.map(i => `<div class="text-[11px] font-bold text-slate-600 leading-snug"><span class="text-slate-800 font-black">${i.qtd}x</span> ${i.nome}</div>`).join('')}
+            </div>
             <div class="mt-2 pt-3 border-t border-slate-200/60 flex justify-between items-center">
                 <div class="flex flex-col">
                     <span class="text-[8px] font-black text-slate-400 uppercase">Pagamento</span>
                     <span class="text-[10px] font-black text-slate-700 uppercase italic">${pagStr}</span>
                 </div>
-                <div class="bg-blue-500 text-white text-[9px] font-black uppercase px-4 py-2 rounded-xl italic flex items-center gap-2 shadow-md group-hover:bg-blue-600 transition-all"><i class="ph-bold ph-chat-teardrop-text"></i> Acompanhar</div>
+                <div class="bg-blue-500 text-white text-[9px] font-black uppercase px-4 py-2 rounded-xl italic flex items-center gap-2 shadow-md group-hover:bg-blue-600 transition-all">
+                    <i class="ph-bold ph-chat-teardrop-text"></i> Acompanhar
+                </div>
             </div>
         </div>`;
     }).join('');
@@ -857,7 +886,11 @@ window.fecharMeusPedidos = function() {
 // =============================================================
 window.abrirHistoricoPedido = function(id, statusAtual, createdAt = null) {
     const pOrig = HISTORICO_PEDIDOS_CLIENTE.find(x => x.id === id);
+    
+    // Adicionamos os textos e cores para o status de Aguardando PIX
     const ux = {
+        'Aguardando PIX': { msg: 'Aguardando pagamento. Anexe o comprovante abaixo! ⏳', icone: '💠', bg: 'bg-yellow-500 text-white' },
+        'Aguardando PIX Recebido': { msg: 'Comprovante recebido! Estamos conferindo para liberar seu pedido na cozinha. ✅', icone: '🔍', bg: 'bg-emerald-500 text-white' },
         'Pendente': { msg: 'Pedido Enviado! Aguardando aceite da loja.', icone: '🛒', bg: 'bg-slate-800 text-white' },
         'Em Preparo': { msg: 'Eba! Seu pedido foi aceito e já está em produção! 🔥', icone: '👨‍🍳', bg: 'bg-orange-500 text-white' },
         'Em Rota': { msg: 'Tudo pronto! Seu pedido saiu para entrega. 🛵💨', icone: '🛵', bg: 'bg-blue-500 text-white' },
@@ -883,13 +916,42 @@ window.abrirHistoricoPedido = function(id, statusAtual, createdAt = null) {
         msgDetalhes += `</div>`;
         
         chat.push({ side: 'client', msg: msgDetalhes, hora: hCriacao });
+
+        // Se o cliente já anexou o comprovante, mostra no chat dele
+        if (pOrig.comprovante_url) {
+            chat.push({ side: 'client', msg: `<a href="${pOrig.comprovante_url}" target="_blank" class="text-blue-500 underline flex items-center gap-1 font-black uppercase tracking-widest text-[10px]"><i class="ph-bold ph-receipt"></i> Ver Comprovante</a>`, hora: hCriacao });
+        }
     }
+
+    // --- LÓGICA DE STATUS DO PIX ---
+    if (statusAtual === 'Aguardando PIX') {
+        if (pOrig && pOrig.comprovante_url) {
+             chat.push({ side: 'store', status: 'Aguardando PIX Recebido', msg: ux['Aguardando PIX Recebido'].msg, icone: ux['Aguardando PIX Recebido'].icone, hora: hAgora });
+        } else {
+             chat.push({ side: 'store', status: 'Aguardando PIX', msg: ux['Aguardando PIX'].msg, icone: ux['Aguardando PIX'].icone, hora: hAgora });
+        }
+    }
+    // --------------------------------
 
     if (statusAtual === 'Pendente') chat.push({ side: 'store', status: 'Pendente', msg: ux['Pendente'].msg, icone: ux['Pendente'].icone, hora: hCriacao });
     if (statusAtual === 'Em Preparo' || statusAtual === 'Em Rota' || statusAtual === 'Entregue') chat.push({ side: 'store', status: 'Em Preparo', msg: ux['Em Preparo'].msg, icone: ux['Em Preparo'].icone, hora: hAgora });
     if (statusAtual === 'Em Rota' || statusAtual === 'Entregue') chat.push({ side: 'store', status: 'Em Rota', msg: ux['Em Rota'].msg, icone: ux['Em Rota'].icone, hora: hAgora });
     if (statusAtual === 'Entregue') chat.push({ side: 'store', status: 'Entregue', msg: ux['Entregue'].msg, icone: ux['Entregue'].icone, hora: hAgora });
     if (statusAtual === 'Cancelado') chat.push({ side: 'store', status: 'Cancelado', msg: ux['Cancelado'].msg, icone: ux['Cancelado'].icone, hora: hAgora });
+
+    // --- CAIXA DE UPLOAD (Só aparece se o pedido é PIX e NÃO tem comprovante ainda) ---
+    let blocoUploadHtml = '';
+    if (statusAtual === 'Aguardando PIX' && pOrig && !pOrig.comprovante_url) {
+        blocoUploadHtml = `
+            <div class="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl animate-pop text-center shadow-sm">
+                <p class="text-[10px] font-black text-yellow-700 uppercase tracking-widest mb-3 italic">Finalize seu pedido</p>
+                <label class="w-full bg-yellow-500 text-white py-4 rounded-xl font-black uppercase text-[10px] cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/30 hover:bg-yellow-600 transition-colors tracking-widest active:scale-95">
+                    <i class="ph-bold ph-upload-simple text-lg"></i> Anexar Comprovante PIX
+                    <input type="file" accept="image/*" class="hidden" onchange="window.enviarComprovantePix(${id}, event)">
+                </label>
+            </div>
+        `;
+    }
 
     const container = document.getElementById('conteudo-historico-pedido');
     container.innerHTML = `
@@ -898,6 +960,7 @@ window.abrirHistoricoPedido = function(id, statusAtual, createdAt = null) {
                 `<div class="self-start max-w-[85%] animate-pop"><p class="text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">${ev.hora} • Você</p><div class="bg-white p-4 rounded-2xl rounded-tl-sm border shadow-sm text-slate-700 text-xs font-black uppercase italic">${ev.msg}</div></div>` : 
                 `<div class="self-end max-w-[85%] animate-pop"><p class="text-[8px] font-black text-slate-400 uppercase mb-1 mr-1 text-right">${ev.hora} • Loja</p><div class="${ux[ev.status].bg} p-4 rounded-2xl rounded-tr-sm shadow-md text-white text-xs font-black uppercase italic text-right flex flex-col items-end gap-1"><span>${ev.msg}</span><span class="text-xl">${ev.icone}</span></div></div>`
             ).join('')}
+            ${blocoUploadHtml}
         </div>`;
     
     document.getElementById('modal-pedido-historico').classList.remove('hidden');
@@ -947,3 +1010,133 @@ _supabase.channel('status-cliente').on('postgres_changes', {event:'UPDATE', sche
         if (hist && !hist.classList.contains('hidden')) { window.abrirMeusPedidos(); }
     }
 }).subscribe();
+
+/* =============================================================
+   MÓDULO: PAGAMENTO VIA PIX E COMPROVANTE WHATSAPP
+   ============================================================= */
+
+let PEDIDO_ATUAL_PIX = null;
+
+window.abrirModalPix = async function(pedidoId, valorTotal) {
+    PEDIDO_ATUAL_PIX = pedidoId;
+    
+    document.getElementById('pix-valor-total').innerText = `R$ ${parseFloat(valorTotal).toFixed(2).replace('.', ',')}`;
+    
+    // --- BUSCA OS DADOS DINÂMICOS DO PIX NO BANCO ---
+    try {
+        const { data: cfg } = await _supabase.from('configuracoes').select('chave_pix, qr_code_pix').eq('id', 1).single();
+        if (cfg) {
+            // Se tiver chave PIX cadastrada, preenche o Input
+            if (cfg.chave_pix) {
+                document.getElementById('pix-chave-input').value = cfg.chave_pix;
+            }
+            
+            // Se tiver Imagem do QR Code cadastrada, mostra a imagem
+            const qrContainer = document.getElementById('pix-qr-container');
+            const qrImg = qrContainer.querySelector('img'); 
+            
+            if (cfg.qr_code_pix) {
+                qrImg.src = cfg.qr_code_pix;
+                qrContainer.classList.remove('hidden'); // Revela a div da imagem
+            } else {
+                qrContainer.classList.add('hidden'); // Esconde se não tiver
+            }
+        }
+    } catch(e) { console.error("Erro ao carregar dados do Pix", e); }
+    // ------------------------------------------------
+
+    const modal = document.getElementById('modal-pix');
+    const box = document.getElementById('modal-pix-box');
+    
+    document.getElementById('modal-pedido-sucesso').classList.add('hidden');
+    
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.style.opacity = '1';
+        box.classList.remove('scale-95');
+    }, 10);
+};
+
+window.fecharModalPix = function() {
+    const modal = document.getElementById('modal-pix');
+    const box = document.getElementById('modal-pix-box');
+    
+    modal.style.opacity = '0';
+    box.classList.add('scale-95');
+    setTimeout(() => { 
+        modal.classList.add('hidden'); 
+        modal.style.display = 'none'; 
+        // Quando fechar o pix, abre a tela de "Pedido Enviado" ou o Histórico
+        window.fecharSucessoAbrirHistorico();
+    }, 300);
+};
+
+window.copiarChavePix = function() {
+    const inputChave = document.getElementById('pix-chave-input');
+    
+    inputChave.select();
+    inputChave.setSelectionRange(0, 99999); 
+    navigator.clipboard.writeText(inputChave.value).then(() => {
+        window.sysAlert('Chave Copiada!', 'Abra o app do seu banco e cole a chave para transferir o valor.', 'sucesso');
+    }).catch(err => {
+        alert("Erro ao copiar a chave. Selecione o texto e copie manualmente.");
+    });
+};
+
+window.enviarComprovanteWpp = async function() {
+    let telLoja = "5527999999999"; // <-- COLOQUE SEU NUMERO AQUI COMO PLANO B
+    
+    try {
+        const { data: cfg } = await _supabase.from('configuracoes').select('telefone_loja').eq('id', 1).single();
+        if (cfg && cfg.telefone_loja) {
+            telLoja = "55" + cfg.telefone_loja.replace(/\D/g, ''); 
+        }
+    } catch(e) {}
+
+    const mensagem = `Olá! Segue o comprovante do pagamento via PIX referente ao meu *Pedido #${PEDIDO_ATUAL_PIX}*.`;
+    const url = `https://wa.me/${telLoja}?text=${encodeURIComponent(mensagem)}`;
+    
+    window.open(url, '_blank');
+    window.fecharModalPix();
+};
+
+window.enviarComprovantePix = async function(pedidoId, event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    window.sysAlert('Enviando...', 'Aguarde enquanto salvamos seu comprovante.', 'info');
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `comprovante_${pedidoId}_${Date.now()}.${fileExt}`;
+    const filePath = `comprovantes/${fileName}`; // Vai salvar na pasta "comprovantes" do seu bucket imagens
+
+    // 1. Faz o upload da imagem
+    const { error: uploadError } = await _supabase.storage.from('imagens').upload(filePath, file);
+
+    if (uploadError) {
+        window.fecharAlerta();
+        return window.sysAlert('Erro', 'Falha ao enviar comprovante. Tente novamente.', 'erro');
+    }
+
+    // 2. Pega o link público da imagem
+    const { data: publicUrlData } = _supabase.storage.from('imagens').getPublicUrl(filePath);
+    const comprovanteUrl = publicUrlData.publicUrl;
+
+    // 3. Salva no pedido
+    const { error: updateError } = await _supabase.from('pedidos').update({ 
+        comprovante_url: comprovanteUrl 
+    }).eq('id', pedidoId);
+
+    if (updateError) {
+        window.fecharAlerta();
+        return window.sysAlert('Erro', 'Comprovante enviado, mas não foi possível vincular ao pedido.', 'erro');
+    }
+
+    window.sysAlert('Sucesso!', 'Comprovante anexado! Em breve seu pedido será confirmado.', 'sucesso');
+    
+    // Atualiza a tela de histórico para mostrar que o comprovante foi recebido
+    if (typeof window.abrirDetalhesPedidoHistorico === 'function') {
+        window.abrirDetalhesPedidoHistorico(pedidoId);
+    }
+};

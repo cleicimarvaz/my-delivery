@@ -250,74 +250,96 @@ window.renderizarMonitor = function() {
     if(contador) contador.innerText = PEDIDOS_ATIVOS.length;
 
     if (PEDIDOS_ATIVOS.length === 0) {
-        monitor.innerHTML = `<div class="col-span-full py-32 text-center opacity-50"><div class="w-24 h-24 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400 dark:text-slate-600 transition-colors"><i class="ph-bold ph-cooking-pot text-5xl"></i></div><h3 class="text-slate-700 dark:text-white font-black text-xl uppercase tracking-widest transition-colors">Tudo limpo por aqui!</h3><p class="text-slate-500 text-xs font-bold uppercase mt-2">Aguardando novos pedidos...</p></div>`;
+        monitor.innerHTML = `<div class="col-span-full py-32 text-center opacity-50"><div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-600 transition-colors"><i class="ph-bold ph-cooking-pot text-5xl"></i></div><h3 class="text-slate-200 font-black text-xl uppercase tracking-widest">Tudo limpo por aqui!</h3><p class="text-slate-500 text-xs font-bold uppercase mt-2">Aguardando novos pedidos...</p></div>`;
         return;
     }
 
     monitor.innerHTML = PEDIDOS_ATIVOS.map(p => {
         const hora = new Date(p.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        let statusClass = p.status === 'Em Preparo' ? 'status-preparo' : (p.status === 'Em Rota' ? 'status-rota' : 'status-pendente');
-        const seloNovo = p.status === 'Pendente' ? `<div class="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full border-4 border-white dark:border-slate-800 animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.5)] z-10 tracking-widest uppercase transition-colors">Novo!</div>` : '';
         
+        // --- CORES DOS CARDS ---
+        let statusClass = p.status === 'Em Preparo' ? 'status-preparo' : (p.status === 'Em Rota' ? 'status-rota' : 'status-pendente');
+        if(p.status === 'Aguardando PIX') statusClass = 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.2)]';
+
+        const seloNovo = (p.status === 'Pendente' || p.status === 'Aguardando PIX') 
+            ? `<div class="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full border-4 border-slate-900 animate-pulse z-10 uppercase">NOVO!</div>` 
+            : '';
+        
+        // --- AVISO DE COMPROVANTE ---
+        let htmlComprovante = '';
+        if (p.comprovante_url) {
+            htmlComprovante = `
+                <div class="mt-2 mb-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between animate-pop">
+                    <span class="text-[9px] font-black text-emerald-400 uppercase italic tracking-widest flex items-center gap-1">💰 COMPROVANTE ANEXADO</span>
+                    <button onclick="window.visualizarComprovante('${p.comprovante_url}')" class="bg-emerald-500 text-white text-[8px] font-black px-3 py-2 rounded-xl shadow-lg hover:bg-emerald-600 transition-all uppercase">VER FOTO</button>
+                </div>`;
+        }
+
         let badgeColor = '';
-        if(p.status === 'Pendente') badgeColor = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800';
-        else if(p.status === 'Em Preparo') badgeColor = 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800';
-        else if(p.status === 'Em Rota') badgeColor = 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+        if(p.status === 'Aguardando PIX') badgeColor = 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50';
+        else if(p.status === 'Pendente') badgeColor = 'bg-red-500/20 text-red-500 border border-red-500/50';
+        else if(p.status === 'Em Preparo') badgeColor = 'bg-orange-500/20 text-orange-500 border border-orange-500/50';
+        else if(p.status === 'Em Rota') badgeColor = 'bg-blue-500/20 text-blue-500 border border-blue-500/50';
 
         const listaItens = p.itens.map(item => `
-            <div class="py-2 border-b border-slate-200 dark:border-slate-700/50 last:border-0 transition-colors">
+            <div class="py-2 border-b border-slate-700/50 last:border-0">
                 <div class="flex items-start gap-3">
-                    <span class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-[10px] font-black px-2 py-1 rounded w-6 text-center transition-colors">${item.qtd}</span>
+                    <span class="bg-slate-700 text-white text-[10px] font-black px-2 py-1 rounded w-6 text-center">${item.qtd}</span>
                     <div class="flex-1">
-                        <p class="text-slate-700 dark:text-slate-200 text-sm font-black uppercase leading-tight transition-colors">${item.nome}</p>
-                        ${item.detalhes ? `<p class="text-[10px] text-red-500 dark:text-red-400 font-bold mt-1 italic bg-red-50 dark:bg-red-900/20 p-1.5 rounded inline-block transition-colors">⚠️ ${item.detalhes}</p>` : ''}
+                        <p class="text-slate-200 text-sm font-black uppercase leading-tight">${item.nome}</p>
+                        ${item.detalhes ? `<p class="text-[10px] text-red-400 font-bold mt-1 italic bg-red-950/30 p-1.5 rounded inline-block">⚠️ ${item.detalhes}</p>` : ''}
                     </div>
                 </div>
             </div>`).join('');
 
+        // --- BOTÕES DE AÇÃO (IGUAL AO SEU PRINT) ---
         let botoesAcaoHtml = '';
-        if (p.status === 'Pendente') {
+        if (p.status === 'Aguardando PIX') {
+            botoesAcaoHtml = `
+            <div class="grid grid-cols-3 gap-2 mt-2">
+                <button onclick="window.atualizarStatus(${p.id}, 'Pendente')" class="col-span-2 w-full bg-emerald-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all italic">💰 CONFIRMAR PIX</button>
+                <button onclick="window.atualizarStatus(${p.id}, 'Cancelado')" class="col-span-1 w-full bg-red-600/20 text-red-500 border border-red-500/50 py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all">RECUSAR</button>
+            </div>`;
+        } else if (p.status === 'Pendente') {
             botoesAcaoHtml = `
             <div class="grid grid-cols-2 gap-3 mt-2">
-                <button onclick="window.abrirPreviaPedido(${p.id})" class="w-full bg-blue-50 text-blue-500 border border-blue-200 py-3 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all shadow-sm hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-500/50 dark:hover:bg-blue-900/50">👁️ VER PEDIDO</button>
-                <button onclick="window.atualizarStatus(${p.id}, 'Cancelado')" class="w-full bg-red-50 text-red-500 border border-red-200 py-3 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all shadow-sm hover:bg-red-100 dark:bg-red-900/30 dark:border-red-500/50 dark:hover:bg-red-900/50">✕ RECUSAR</button>
+                <button onclick="window.abrirPreviaPedido(${p.id})" class="w-full bg-slate-700 text-slate-300 py-3 rounded-xl text-[10px] font-black uppercase shadow-sm">👁️ VER</button>
+                <button onclick="window.atualizarStatus(${p.id}, 'Em Preparo')" class="w-full bg-emerald-600 text-white py-3 rounded-xl text-[10px] font-black uppercase shadow-md">✓ ACEITAR</button>
             </div>`;
         } else if (p.status === 'Em Preparo') {
             botoesAcaoHtml = `
             <div class="mt-2">
-                <button onclick="window.atualizarStatus(${p.id}, 'Em Rota')" class="w-full bg-blue-50 text-blue-500 border border-blue-200 py-3 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all shadow-sm hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-500/50 dark:hover:bg-blue-900/50">🛵 ENTREGAR</button>
+                <button onclick="window.atualizarStatus(${p.id}, 'Em Rota')" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-2">🛵 ENTREGAR</button>
             </div>`;
         } else if (p.status === 'Em Rota') {
             botoesAcaoHtml = `
             <div class="mt-2">
-                <button onclick="window.atualizarStatus(${p.id}, 'Entregue')" class="w-full bg-emerald-500 text-white py-3 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all shadow-md hover:bg-emerald-600">✓ FINALIZAR</button>
+                <button onclick="window.atualizarStatus(${p.id}, 'Entregue')" class="w-full bg-emerald-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-2">✓ FINALIZAR</button>
             </div>`;
         }
 
         return `
-            <div class="card-pedido bg-white dark:bg-slate-800 rounded-[2rem] p-5 shadow-xl border border-slate-200 dark:border-slate-700/50 flex flex-col justify-between h-full relative transition-colors duration-300 ${statusClass}">
+            <div class="card-pedido bg-slate-800/50 rounded-[2rem] p-5 shadow-xl border border-slate-700/50 flex flex-col justify-between h-full relative transition-all ${statusClass}">
                 ${seloNovo}
-                <div class="flex justify-between items-start mb-4 border-b border-slate-200 dark:border-slate-700 pb-3 transition-colors">
+                <div class="flex justify-between items-start mb-4 border-b border-slate-700 pb-3">
                     <div class="flex-1 min-w-0 pr-2">
-                        <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest transition-colors">Pedido #${p.id}</span>
-                        <h3 class="text-slate-800 dark:text-white font-black text-lg uppercase italic truncate transition-colors" title="${p.cliente_nome}">${p.cliente_nome}</h3>
+                        <span class="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Pedido #${p.id}</span>
+                        <h3 class="text-white font-black text-lg uppercase italic leading-tight" title="${p.cliente_nome}">${p.cliente_nome}</h3>
                     </div>
                     <div class="flex flex-col items-end gap-2 shrink-0">
-                        <span class="text-slate-500 dark:text-slate-400 font-bold text-xs transition-colors">${hora}</span>
+                        <span class="text-slate-400 font-bold text-xs">${hora}</span>
                         <div class="flex items-center gap-2">
-                            <span class="text-[8px] font-black uppercase px-2 py-1 rounded-md ${badgeColor} transition-colors tracking-widest">${p.status}</span>
-                            
-                            <button onclick='window.imprimirPedidoMaster(${JSON.stringify(p)})' 
-                                    class="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 dark:hover:text-white transition-all shadow-sm active:scale-95 border border-slate-200 dark:border-slate-600" 
-                                    title="Imprimir Comanda">
-                                <i class="ph-bold ph-printer text-xl"></i>
-                            </button>
+                            <span class="text-[8px] font-black uppercase px-2 py-1 rounded-md ${badgeColor} tracking-widest">${p.status}</span>
+                            <button onclick='window.imprimirPedidoMaster(${JSON.stringify(p)})' class="bg-slate-700 text-slate-300 w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all shadow-sm border border-slate-600"><i class="ph-bold ph-printer text-xl"></i></button>
                         </div>
                     </div>
                 </div>
-                <div class="space-y-1 mb-4 bg-slate-50 dark:bg-slate-900/30 p-3 rounded-2xl max-h-48 overflow-y-auto custom-scrollbar transition-colors">${listaItens}</div>
-                <div class="mt-auto pt-3 border-t border-slate-200 dark:border-slate-700 transition-colors">
-                    <p class="text-[8px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest mb-1 text-center transition-colors">AÇÕES:</p>
+
+                ${htmlComprovante}
+
+                <div class="space-y-1 mb-4 bg-slate-900/50 p-3 rounded-2xl max-h-48 overflow-y-auto">${listaItens}</div>
+                <div class="mt-auto pt-3 border-t border-slate-700">
+                    <p class="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-2 text-center">Ações:</p>
                     ${botoesAcaoHtml}
                 </div>
             </div>`;
@@ -447,3 +469,28 @@ window.fecharPrevia = () => {
         modal.style.display = 'none';
     }
 }
+
+window.visualizarComprovante = function(url) {
+    document.getElementById('img-comprovante-full').src = url;
+    const modal = document.getElementById('modal-ver-comprovante');
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+};
+
+window.fecharModalComprovante = function() {
+    const modal = document.getElementById('modal-ver-comprovante');
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+};
+
+window.fecharModalComprovante = function() {
+    const modal = document.getElementById('modal-ver-comprovante');
+    const box = document.getElementById('box-comprovante');
+
+    modal.style.opacity = '0';
+    box.classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }, 300);
+};
