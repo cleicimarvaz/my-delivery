@@ -726,6 +726,12 @@ window.enviarPedido = async function() {
     if (!LOJA_ABERTA) return window.sysAlert("Loja Fechada", "Não aceitamos pedidos no momento.", "erro");
 
     const fp = document.getElementById('forma-pagamento').value;
+    
+    // --- ADIÇÃO: Captura o valor do troco se o campo existir ---
+    const campoTroco = document.getElementById('troco-para');
+    const trocoVal = campoTroco ? campoTroco.value : "";
+    // -----------------------------------------------------------
+
     const vtProdutos = CARRINHO.reduce((acc, i) => acc + (i.precoUnitario * i.qtd), 0);
     const taxa = window.calcularFreteAtual();
     const vtFinalComFrete = vtProdutos + taxa;
@@ -740,6 +746,10 @@ window.enviarPedido = async function() {
         taxa_entrega: taxa,
         referencia: (CLIENTE_LOGADO.referencia || CLIENTE_LOGADO.ponto_referencia || "-").toUpperCase(),
         
+        // --- ADIÇÃO: Inclui o troco no banco ---
+        troco_para: trocoVal, 
+        // ---------------------------------------
+
         itens: CARRINHO.map(i => ({ 
             nome: i.produto.nome, 
             qtd: i.qtd, 
@@ -750,9 +760,7 @@ window.enviarPedido = async function() {
             sabor: i.sabor || ""
         })), 
         total: vtFinalComFrete, 
-        // --- AQUI ESTÁ A MÁGICA DO STATUS ---
         status: fp.toUpperCase() === 'PIX' ? 'Aguardando PIX' : 'Pendente',
-        // ------------------------------------
         created_at: new Date().toISOString()
     };
     
@@ -778,6 +786,11 @@ window.enviarPedido = async function() {
             document.getElementById('sucesso-pgto').innerText = fp.toUpperCase();
             document.getElementById('sucesso-total').innerText = `R$ ${vtFinalComFrete.toFixed(2).replace('.', ',')}`;
             
+            // Se tiver troco, podemos mostrar na tela de sucesso também (opcional)
+            if(trocoVal) {
+                console.log("Troco solicitado para: " + trocoVal);
+            }
+
             const modS = document.getElementById('modal-pedido-sucesso');
             if (modS) {
                 modS.classList.remove('hidden'); 
@@ -1138,5 +1151,18 @@ window.enviarComprovantePix = async function(pedidoId, event) {
     // Atualiza a tela de histórico para mostrar que o comprovante foi recebido
     if (typeof window.abrirDetalhesPedidoHistorico === 'function') {
         window.abrirDetalhesPedidoHistorico(pedidoId);
+    }
+};
+
+window.mostrarTroco = function() {
+    const metodo = document.getElementById('forma-pagamento').value;
+    const wrapper = document.getElementById('wrapper-troco');
+    const inputTroco = document.getElementById('troco-para');
+
+    if (metodo === 'Dinheiro') {
+        wrapper.classList.remove('hidden');
+    } else {
+        wrapper.classList.add('hidden');
+        inputTroco.value = ''; // Limpa o valor se mudar para Pix/Cartão
     }
 };
