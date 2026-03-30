@@ -298,10 +298,10 @@
         <span id="cifrao-troco" class="absolute left-5 text-slate-400 font-black text-xs pointer-events-none transition-opacity">R$</span>
         
         <input 
-            type="number" 
+            type="tel" 
             id="troco-para" 
-            step="0.01" 
             placeholder="0,00" 
+            oninput="window.mascaraMoeda(this)"
             class="w-full bg-slate-50 border-2 border-slate-100 p-4 pl-12 rounded-2xl text-sm font-black text-slate-700 outline-none focus:border-emerald-100 focus:bg-white transition-all placeholder:text-slate-300 disabled:opacity-40 disabled:bg-slate-100 disabled:cursor-not-allowed shadow-inner"
         >
     </div>
