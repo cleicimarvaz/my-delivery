@@ -762,7 +762,7 @@ window.carregarHistoricoEstorno = async function() {
             </div>
             
             <div class="flex gap-2">
-                <button onclick='window.imprimirPedidoMaster(${JSON.stringify(p)})' class="flex-1 bg-blue-50 text-blue-600 py-3 rounded-xl text-[9px] font-black uppercase border border-blue-100 flex items-center justify-center gap-2 active:scale-95 transition-all">
+                <button onclick='window.(${JSON.stringify(p)})' class="flex-1 bg-blue-50 text-blue-600 py-3 rounded-xl text-[9px] font-black uppercase border border-blue-100 flex items-center justify-center gap-2 active:scale-95 transition-all">
                     <i class="ph-bold ph-printer"></i> Imprimir
                 </button>
                 
@@ -1215,7 +1215,7 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     try {
         const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
         if (cfg) {
-            nomeLoja = cfg.nome_loja || nomeLoja;
+            nomeLoja = cfg.nome_lo_formatado || cfg.nome_loja || nomeLoja;
             telLoja = cfg.telefone_lo_formatado || cfg.telefone_loja || "";
         }
     } catch(e) {}
@@ -1230,12 +1230,10 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     txt += `DATA: ${new Date(pedido.created_at).toLocaleString('pt-BR')}\n`;
     txt += `CLIENTE: ${quebrarTexto(pedido.cliente_nome || 'NÃO INFORMADO', 23, 9)}\n`;
     
-    // --- ENDEREÇO (DIVISÃO INTELIGENTE POR HÍFEN) ---
     let enderecoCompleto = (pedido.endereco || 'RETIRADA').split('|')[0].trim();
     let rua = enderecoCompleto;
     let bairroCidade = "";
     
-    // Separa a partir do último "-" (ex: Rua X, 148 - Bairro, Cidade)
     let ultimoTraco = enderecoCompleto.lastIndexOf('-');
     if (ultimoTraco !== -1) {
         rua = enderecoCompleto.substring(0, ultimoTraco).trim();
@@ -1258,17 +1256,15 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
         let obsTexto = "";
         let complementos = [];
 
-        // Filtro: Se o sistema salvou a palavra "SABOR:" dentro das observações/detalhes
         if (i.detalhes) {
             let det = removerAcentos(i.detalhes);
             if (det.includes("SABOR:")) {
-                saborReal = det; // Move para a variável de Sabor
+                saborReal = det;
             } else {
-                complementos.push(det); // Mantém como Observação extra
+                complementos.push(det);
             }
         }
 
-        // Garante que só fique o nome do sabor, removendo lixos e prefixos
         if (saborReal) {
             saborReal = saborReal.replace(/OBS:\s*/g, '').replace(/SABOR:\s*/g, '').trim();
             txt += `  SABOR: ${quebrarTexto(saborReal, 23, 9)}\n`;
@@ -1281,37 +1277,49 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
             obsTexto = complementos.join(' | ');
             txt += `  OBS: ${quebrarTexto(obsTexto, 25, 7)}\n`;
         }
-        txt += `\n`; // Espaço entre produtos
+        txt += `\n`;
     });
 
     txt += `${divisor}\n`;
     txt += formatarLinhaDupla("TOTAL:", `R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}`) + "\n";
+    
+    // --- NOVO: LÓGICA DE TROCO NA IMPRESSÃO ---
+    const pgtoLimpo = removerAcentos(pedido.forma_pagamento || '').toUpperCase();
+    if (pgtoLimpo.includes("DINHEIRO") && pedido.troco_para) {
+        const valorTrocoPara = parseFloat(pedido.troco_para.toString().replace(',', '.'));
+        const valorPedido = parseFloat(pedido.total);
+        
+        if (valorTrocoPara > valorPedido) {
+            const levarTroco = valorTrocoPara - valorPedido;
+            txt += `${divisor}\n`;
+            txt += `TROCO PARA: R$ ${valorTrocoPara.toFixed(2).replace('.', ',')}\n`;
+            txt += `LEVAR: R$ ${levarTroco.toFixed(2).replace('.', ',')}\n`;
+        }
+    }
+    // ------------------------------------------
+
     txt += `${divisor}\n\n`;
     txt += `${centralizar("OBRIGADO PELA PREFERENCIA!")}\n\n\n`;
 
-    // --- DETECÇÃO DE DISPOSITIVO E IMPRESSÃO ---
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
-        // Android via RawBT
         const base64 = btoa(unescape(encodeURIComponent(txt)));
         window.location.href = "rawbt:base64," + base64;
     } else {
-        // iOS (Open Label / AirPrint) e PC
         const area = document.getElementById('area-impressao-termica');
         if (area) {
-            // Injetamos um estilo exclusivo para forçar o Safari/iOS a usar 58mm e fundo branco
             area.innerHTML = `
                 <style>
                     @media print {
                         @page {
                             margin: 0 !important;
-                            size: 58mm auto !important; /* O segredo para o iOS não gerar um PDF tamanho A4 */
+                            size: 58mm auto !important;
                         }
                         body, html {
                             margin: 0 !important;
                             padding: 0 !important;
-                            background: #FFFFFF !important; /* Mata o fundo preto do Open Label */
+                            background: #FFFFFF !important;
                         }
                     }
                 </style>
@@ -1321,7 +1329,6 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
             `;
             area.style.display = 'block';
             
-            // Um pequeno atraso (300ms) para garantir que o iOS leia a tag <style> antes de abrir a tela
             setTimeout(() => { 
                 window.print(); 
                 area.style.display = 'none'; 
