@@ -215,3 +215,14 @@ body.page-cozinha {
         border-bottom: 1px dashed #000 !important;
     }
 }
+
+/* Remove as setas de aumentar/diminuir do Chrome, Safari, Edge e Firefox */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+}
