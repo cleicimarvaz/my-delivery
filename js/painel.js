@@ -1,3 +1,39 @@
+// =============================================================
+// SEGURANÇA: AUTH GUARD + INATIVIDADE (15 MIN)
+// =============================================================
+
+(function() {
+    // 1. Verifica se existe sessão
+    const sessao = localStorage.getItem('usuarioLogado');
+    if (!sessao) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // 2. Configura o Timer de Inatividade
+    let timerInatividade;
+    const TEMPO_LIMITE = 15 * 60 * 1000; // 15 minutos em milissegundos
+
+    function resetarTimer() {
+        clearTimeout(timerInatividade);
+        timerInatividade = setTimeout(logoutAutomatico, TEMPO_LIMITE);
+    }
+
+    function logoutAutomatico() {
+        localStorage.removeItem('usuarioLogado');
+        window.location.href = 'login.html?motivo=inatividade';
+    }
+
+    // Ouvintes de eventos para detectar atividade do usuário
+    const eventos = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    eventos.forEach(evento => {
+        document.addEventListener(evento, resetarTimer, true);
+    });
+
+    // Inicia a contagem
+    resetarTimer();
+})();
+
 /* =============================================================
    MÓDULO: UX, MODAIS E CORREÇÃO DE TELA (FORÇA BRUTA)
    ============================================================= */
