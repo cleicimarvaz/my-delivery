@@ -29,6 +29,11 @@
         .modal-scroll::-webkit-scrollbar { width: 4px; }
         .modal-scroll::-webkit-scrollbar-track { background: transparent; }
         .modal-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        /* Remove setas do input number/tel para manter o visual limpo */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
     </style>
 </head>
 <body class="pb-40 select-none bg-slate-50">
@@ -206,10 +211,8 @@
             <button onclick="window.fecharDetalhes()" class="absolute top-4 right-4 bg-black/20 backdrop-blur p-2 rounded-full z-50 text-white hover:bg-black/40 transition-colors">✕</button>
             
             <div class="flex-1 overflow-y-auto modal-scroll bg-slate-50">
-                
                 <div class="relative h-56 sm:h-72 bg-slate-200 overflow-hidden shrink-0">
-                    <div id="galeria-fotos-container" class="flex h-full w-full overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth">
-                        </div>
+                    <div id="galeria-fotos-container" class="flex h-full w-full overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth"></div>
 
                     <div id="indicador-fotos" class="absolute bottom-12 right-6 bg-black/50 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full z-20 uppercase tracking-widest hidden">
                         1 / 1
@@ -305,7 +308,7 @@
                                 >
                             </div>
                         </div>
-                    </div>
+                        </div>
 
                     <div class="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col gap-2 shadow-sm">
                         <div class="flex justify-between items-center">
@@ -332,7 +335,6 @@
             </div>
         </div>
     </div>
-
     <div id="modal-pix" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
         <div id="modal-pix-box" class="bg-white w-full max-w-sm rounded-[2rem] p-6 text-center transform scale-95 transition-all duration-300">
             
@@ -428,7 +430,7 @@
             
             <button onclick="window.fecharTodosModais()" class="flex flex-col items-center gap-1 text-slate-800 w-14 sm:w-16 active:scale-90 transition-all">
                 <i class="ph-fill ph-book-open text-2xl"></i>
-                <span class="text-[9px] font-black uppercase tracking-widest italic">Cardápio</span>
+                <span class="text-[9px] font-black uppercase tracking-widest italic leading-none mt-1">Cardápio</span>
             </button>
             
             <div class="relative -top-8">
