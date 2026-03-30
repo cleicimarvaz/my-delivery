@@ -727,14 +727,35 @@ window.enviarPedido = async function() {
 
     const fp = document.getElementById('forma-pagamento').value;
     
-    // --- ADIÇÃO: Captura o valor do troco se o campo existir ---
+    // --- LÓGICA DE TROCO ATUALIZADA ---
     const campoTroco = document.getElementById('troco-para');
-    const trocoVal = campoTroco ? campoTroco.value : "";
-    // -----------------------------------------------------------
+    const checkSemTroco = document.getElementById('sem-troco');
+    let trocoFinal = "";
 
+    // Calculamos os valores primeiro para validar
     const vtProdutos = CARRINHO.reduce((acc, i) => acc + (i.precoUnitario * i.qtd), 0);
     const taxa = window.calcularFreteAtual();
     const vtFinalComFrete = vtProdutos + taxa;
+
+    // Se o pagamento for em Dinheiro, validamos o troco
+    if (fp.toUpperCase() === 'DINHEIRO') {
+        if (checkSemTroco && checkSemTroco.checked) {
+            trocoFinal = "NÃO PRECISA";
+        } else {
+            const valorDigitado = campoTroco ? campoTroco.value.replace(',', '.') : "";
+            
+            if (!valorDigitado || valorDigitado === "") {
+                return window.sysAlert("Atenção", "Por favor, informe para quanto precisa de troco ou marque 'Não preciso'.", "erro");
+            }
+
+            if (parseFloat(valorDigitado) < vtFinalComFrete) {
+                return window.sysAlert("Valor Insuficiente", `O valor para troco (R$ ${parseFloat(valorDigitado).toFixed(2)}) não pode ser menor que o total do pedido (R$ ${vtFinalComFrete.toFixed(2)}).`, "erro");
+            }
+            
+            trocoFinal = valorDigitado;
+        }
+    }
+    // ----------------------------------
 
     const enderecoFormatado = `${CLIENTE_LOGADO.rua}, ${CLIENTE_LOGADO.num} - ${CLIENTE_LOGADO.bairro}, ${CLIENTE_LOGADO.cidade}`.toUpperCase();
 
@@ -746,9 +767,8 @@ window.enviarPedido = async function() {
         taxa_entrega: taxa,
         referencia: (CLIENTE_LOGADO.referencia || CLIENTE_LOGADO.ponto_referencia || "-").toUpperCase(),
         
-        // --- ADIÇÃO: Inclui o troco no banco ---
-        troco_para: trocoVal, 
-        // ---------------------------------------
+        // Salvamos o valor validado aqui
+        troco_para: trocoFinal, 
 
         itens: CARRINHO.map(i => ({ 
             nome: i.produto.nome, 
@@ -781,16 +801,12 @@ window.enviarPedido = async function() {
         if (fp.toUpperCase() === 'PIX') {
             window.abrirModalPix(data.id, vtFinalComFrete);
         } else {
-            document.getElementById('sucesso-pedido-id').innerText = `Pedido #${data.id}`;
-            document.getElementById('sucesso-endereco').innerText = `${CLIENTE_LOGADO.rua}, ${CLIENTE_LOGADO.num}`;
-            document.getElementById('sucesso-pgto').innerText = fp.toUpperCase();
-            document.getElementById('sucesso-total').innerText = `R$ ${vtFinalComFrete.toFixed(2).replace('.', ',')}`;
+            // Preenche a tela de sucesso
+            if(document.getElementById('sucesso-pedido-id')) document.getElementById('sucesso-pedido-id').innerText = `Pedido #${data.id}`;
+            if(document.getElementById('sucesso-endereco')) document.getElementById('sucesso-endereco').innerText = `${CLIENTE_LOGADO.rua}, ${CLIENTE_LOGADO.num}`;
+            if(document.getElementById('sucesso-pgto')) document.getElementById('sucesso-pgto').innerText = fp.toUpperCase();
+            if(document.getElementById('sucesso-total')) document.getElementById('sucesso-total').innerText = `R$ ${vtFinalComFrete.toFixed(2).replace('.', ',')}`;
             
-            // Se tiver troco, podemos mostrar na tela de sucesso também (opcional)
-            if(trocoVal) {
-                console.log("Troco solicitado para: " + trocoVal);
-            }
-
             const modS = document.getElementById('modal-pedido-sucesso');
             if (modS) {
                 modS.classList.remove('hidden'); 
@@ -1158,11 +1174,39 @@ window.mostrarTroco = function() {
     const metodo = document.getElementById('forma-pagamento').value;
     const wrapper = document.getElementById('wrapper-troco');
     const inputTroco = document.getElementById('troco-para');
+    const checkboxSemTroco = document.getElementById('sem-troco');
 
     if (metodo === 'Dinheiro') {
         wrapper.classList.remove('hidden');
     } else {
         wrapper.classList.add('hidden');
-        inputTroco.value = ''; // Limpa o valor se mudar para Pix/Cartão
+        
+        // --- LIMPEZA DE SEGURANÇA ---
+        inputTroco.value = ''; 
+        if (checkboxSemTroco) {
+            checkboxSemTroco.checked = false; // Desmarca o "Não preciso"
+            window.toggleInputTroco();        // Garante que o input volte a ficar branco/habilitado
+        }
+    }
+};
+
+window.toggleInputTroco = function() {
+    const semTroco = document.getElementById('sem-troco').checked;
+    const input = document.getElementById('troco-para');
+    const cifrao = document.getElementById('cifrao-troco');
+
+    if (semTroco) {
+        input.value = '';
+        input.disabled = true;
+        // Adiciona um estilo visual de "bloqueado"
+        input.classList.add('bg-slate-100', 'text-slate-400', 'cursor-not-allowed', 'opacity-50');
+        if(cifrao) cifrao.classList.add('opacity-30');
+    } else {
+        input.disabled = false;
+        input.classList.remove('bg-slate-100', 'text-slate-400', 'cursor-not-allowed', 'opacity-50');
+        if(cifrao) cifrao.classList.remove('opacity-30');
+        
+        // UX: Foca no campo automaticamente para o cliente digitar
+        setTimeout(() => input.focus(), 100); 
     }
 };
