@@ -257,7 +257,6 @@ window.renderizarMonitor = function() {
     monitor.innerHTML = PEDIDOS_ATIVOS.map(p => {
         const hora = new Date(p.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         
-        // --- CORES DOS CARDS ---
         let statusClass = p.status === 'Em Preparo' ? 'status-preparo' : (p.status === 'Em Rota' ? 'status-rota' : 'status-pendente');
         if(p.status === 'Aguardando PIX') statusClass = 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.2)]';
 
@@ -265,7 +264,6 @@ window.renderizarMonitor = function() {
             ? `<div class="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full border-4 border-slate-900 animate-pulse z-10 uppercase">NOVO!</div>` 
             : '';
         
-        // --- AVISO DE COMPROVANTE ---
         let htmlComprovante = '';
         if (p.comprovante_url) {
             htmlComprovante = `
@@ -275,11 +273,25 @@ window.renderizarMonitor = function() {
                 </div>`;
         }
 
+        // --- NOVO: BLOCO DE TROCO NO MONITOR ---
+        let htmlTrocoMonitor = '';
+        if (p.troco_para && p.troco_para.trim() !== "" && p.forma_pagamento === 'DINHEIRO') {
+            const valorTrocoCalculado = parseFloat(p.troco_para.replace(',', '.')) - parseFloat(p.total);
+            htmlTrocoMonitor = `
+                <div class="mt-2 mb-3 p-3 bg-orange-500/10 border border-orange-500/40 rounded-2xl animate-pop">
+                    <p class="text-[9px] font-black text-orange-400 uppercase italic tracking-widest mb-1">💵 LEVAR TROCO</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-slate-300 uppercase">Para: R$ ${p.troco_para}</span>
+                        <span class="text-xs font-black text-orange-500">Voltar: R$ ${valorTrocoCalculado.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                </div>`;
+        }
+
         let badgeColor = '';
         if(p.status === 'Aguardando PIX') badgeColor = 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50';
         else if(p.status === 'Pendente') badgeColor = 'bg-red-500/20 text-red-500 border border-red-500/50';
         else if(p.status === 'Em Preparo') badgeColor = 'bg-orange-500/20 text-orange-500 border border-orange-500/50';
-        else if(p.status === 'Em Rota') badgeColor = 'bg-blue-500/20 text-blue-500 border border-blue-500/50';
+        else if(p.status === 'Em Rota') badgeColor = 'bg-blue-500/20 text-blue-500 border border-blue-200/50';
 
         const listaItens = p.itens.map(item => `
             <div class="py-2 border-b border-slate-700/50 last:border-0">
@@ -292,7 +304,6 @@ window.renderizarMonitor = function() {
                 </div>
             </div>`).join('');
 
-        // --- BOTÕES DE AÇÃO (IGUAL AO SEU PRINT) ---
         let botoesAcaoHtml = '';
         if (p.status === 'Aguardando PIX') {
             botoesAcaoHtml = `
@@ -336,6 +347,7 @@ window.renderizarMonitor = function() {
                 </div>
 
                 ${htmlComprovante}
+                ${htmlTrocoMonitor}
 
                 <div class="space-y-1 mb-4 bg-slate-900/50 p-3 rounded-2xl max-h-48 overflow-y-auto">${listaItens}</div>
                 <div class="mt-auto pt-3 border-t border-slate-700">
