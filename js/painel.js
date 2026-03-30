@@ -1198,11 +1198,15 @@ window.removerImagemProd = function(idx) {
 window.imprimirPedidoMaster = async function(pedidoOuId) {
     let pedido;
     if (typeof pedidoOuId === 'string' || typeof pedidoOuId === 'number') {
-        pedido = PEDIDOS_LISTA.find(p => p.id == pedidoOuId);
-    } else { pedido = pedidoOuId; }
+        // Tenta buscar na lista global de pedidos do admin
+        pedido = (typeof PEDIDOS_LISTA !== 'undefined' ? PEDIDOS_LISTA : PEDIDOS_ATIVOS).find(p => p.id == pedidoOuId);
+    } else { 
+        pedido = pedidoOuId; 
+    }
 
     if (!pedido) return alert("Erro: Pedido não encontrado.");
 
+    // --- HELPERS DE FORMATAÇÃO ---
     const removerAcentos = (str) => {
         if (!str) return "";
         const mapa = {'á':'a','à':'a','â':'a','ã':'a','ä':'a','Á':'A','À':'A','Â':'A','Ã':'A','Ä':'A','é':'e','è':'e','ê':'e','ë':'e','É':'E','È':'E','Ê':'E','Ë':'E','í':'i','ì':'i','î':'i','ï':'i','Í':'I','Ì':'I','Î':'I','Ï':'I','ó':'o','ò':'o','ô':'o','õ':'o','ö':'o','Ó':'O','Ò':'O','Ô':'O','Õ':'O','Ö':'O','ú':'u','ù':'u','û':'u','ü':'u','Ú':'U','Ù':'U','Û':'U','Ü':'U','ç':'c','Ç':'C','ñ':'n','Ñ':'N'};
@@ -1245,14 +1249,14 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
 
     const divisor = "-".repeat(COLUNAS);
 
-    // --- DADOS DA LOJA ---
-    let nomeLoja = "MY DELIVERY";
+    // --- DADOS DA LOJA (SUPABASE) ---
+    let nomeLoja = "WEB COMANDA";
     let telLoja = "";
     try {
         const { data: cfg } = await _supabase.from('configuracoes').select('nome_loja, telefone_loja').eq('id', 1).single();
         if (cfg) {
-            nomeLoja = cfg.nome_lo_formatado || cfg.nome_loja || nomeLoja;
-            telLoja = cfg.telefone_lo_formatado || cfg.telefone_loja || "";
+            nomeLoja = cfg.nome_loja || nomeLoja;
+            telLoja = cfg.telefone_loja || "";
         }
     } catch(e) {}
 
@@ -1266,10 +1270,10 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     txt += `DATA: ${new Date(pedido.created_at).toLocaleString('pt-BR')}\n`;
     txt += `CLIENTE: ${quebrarTexto(pedido.cliente_nome || 'NÃO INFORMADO', 23, 9)}\n`;
     
+    // Endereço
     let enderecoCompleto = (pedido.endereco || 'RETIRADA').split('|')[0].trim();
     let rua = enderecoCompleto;
     let bairroCidade = "";
-    
     let ultimoTraco = enderecoCompleto.lastIndexOf('-');
     if (ultimoTraco !== -1) {
         rua = enderecoCompleto.substring(0, ultimoTraco).trim();
@@ -1283,22 +1287,19 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     txt += `${divisor}\n`;
     txt += `ITENS DO PEDIDO:\n\n`;
 
+    // Itens
     pedido.itens.forEach(i => {
         let nomeItem = `${i.qtd}X ${i.nome}`;
         let precoTotalItem = `R$ ${(i.preco * i.qtd).toFixed(2).replace('.', ',')}`;
         txt += formatarLinhaDupla(nomeItem, precoTotalItem) + "\n";
         
         let saborReal = i.sabor ? removerAcentos(i.sabor) : "";
-        let obsTexto = "";
         let complementos = [];
 
         if (i.detalhes) {
             let det = removerAcentos(i.detalhes);
-            if (det.includes("SABOR:")) {
-                saborReal = det;
-            } else {
-                complementos.push(det);
-            }
+            if (det.includes("SABOR:")) saborReal = det;
+            else complementos.push(det);
         }
 
         if (saborReal) {
@@ -1310,8 +1311,7 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
         if (i.removidos?.length) complementos.push("SEM: " + i.removidos.join(', '));
 
         if (complementos.length > 0) {
-            obsTexto = complementos.join(' | ');
-            txt += `  OBS: ${quebrarTexto(obsTexto, 25, 7)}\n`;
+            txt += `  OBS: ${quebrarTexto(complementos.join(' | '), 25, 7)}\n`;
         }
         txt += `\n`;
     });
@@ -1319,24 +1319,31 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
     txt += `${divisor}\n`;
     txt += formatarLinhaDupla("TOTAL:", `R$ ${parseFloat(pedido.total).toFixed(2).replace('.', ',')}`) + "\n";
     
-    // --- NOVO: LÓGICA DE TROCO NA IMPRESSÃO ---
+    // --- LÓGICA DE TROCO (ESTA É A PARTE NOVA) ---
     const pgtoLimpo = removerAcentos(pedido.forma_pagamento || '').toUpperCase();
     if (pgtoLimpo.includes("DINHEIRO") && pedido.troco_para) {
-        const valorTrocoPara = parseFloat(pedido.troco_para.toString().replace(',', '.'));
-        const valorPedido = parseFloat(pedido.total);
-        
-        if (valorTrocoPara > valorPedido) {
-            const levarTroco = valorTrocoPara - valorPedido;
-            txt += `${divisor}\n`;
-            txt += `TROCO PARA: R$ ${valorTrocoPara.toFixed(2).replace('.', ',')}\n`;
-            txt += `LEVAR: R$ ${levarTroco.toFixed(2).replace('.', ',')}\n`;
+        txt += `${divisor}\n`;
+        if (pedido.troco_para === "NÃO PRECISA") {
+            txt += `${centralizar("NAO PRECISA DE TROCO")}\n`;
+        } else {
+            const valorTrocoPara = parseFloat(pedido.troco_para.toString().replace(',', '.'));
+            const valorPedido = parseFloat(pedido.total);
+            
+            if (!isNaN(valorTrocoPara) && valorTrocoPara > valorPedido) {
+                const levarTroco = valorTrocoPara - valorPedido;
+                txt += `TROCO PARA: R$ ${valorTrocoPara.toFixed(2).replace('.', ',')}\n`;
+                txt += `LEVAR: R$ ${levarTroco.toFixed(2).replace('.', ',')}\n`;
+            } else {
+                txt += `${centralizar("NAO PRECISA DE TROCO")}\n`;
+            }
         }
     }
-    // ------------------------------------------
+    // ----------------------------------------------
 
     txt += `${divisor}\n\n`;
     txt += `${centralizar("OBRIGADO PELA PREFERENCIA!")}\n\n\n`;
 
+    // --- EXECUÇÃO DA IMPRESSÃO ---
     const isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
@@ -1348,27 +1355,16 @@ window.imprimirPedidoMaster = async function(pedidoOuId) {
             area.innerHTML = `
                 <style>
                     @media print {
-                        @page {
-                            margin: 0 !important;
-                            size: 58mm auto !important;
-                        }
-                        body, html {
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            background: #FFFFFF !important;
-                        }
+                        @page { margin: 0 !important; size: 58mm auto !important; }
+                        body, html { margin: 0 !important; padding: 0 !important; background: #FFF !important; }
                     }
                 </style>
-                <div style="width: 58mm; max-width: 58mm; background-color: #FFFFFF !important; margin: 0; padding: 0;">
-                    <pre style="font-family: monospace; font-size: 11px; font-weight: 900; color: #000000; line-height: 1.2; padding: 2mm 0; margin: 0; white-space: pre-wrap; background-color: #FFFFFF !important;">${txt}</pre>
+                <div style="width: 58mm; background-color: #FFF !important; margin: 0; padding: 0;">
+                    <pre style="font-family: monospace; font-size: 11px; font-weight: 900; color: #000; line-height: 1.2; padding: 2mm 0; margin: 0; white-space: pre-wrap;">${txt}</pre>
                 </div>
             `;
             area.style.display = 'block';
-            
-            setTimeout(() => { 
-                window.print(); 
-                area.style.display = 'none'; 
-            }, 300);
+            setTimeout(() => { window.print(); area.style.display = 'none'; }, 300);
         }
     }
 }
