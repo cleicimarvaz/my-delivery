@@ -742,7 +742,6 @@ window.validarCheckout = function() {
 // MÓDULO 7: ENVIO DO PEDIDO E HISTÓRICO
 // =============================================================
 window.enviarPedido = async function() {
-window.enviarPedido = async function() {
     if (!LOJA_ABERTA) return window.sysAlert("Loja Fechada", "Não aceitamos pedidos no momento.", "erro");
 
     const fp = document.getElementById('forma-pagamento').value;
