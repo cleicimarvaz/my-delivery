@@ -108,6 +108,19 @@
             }, 3000);
         }
 
+        // Verifica se foi redirecionado por inatividade ao carregar a página
+window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('motivo') === 'inatividade') {
+        // Usando sua própria função de erro para avisar a inatividade
+        mostrarErro('Sua sessão expirou por inatividade.');
+        
+        // Opcional: mudar a cor do toast para amarelo/azul se quiser diferenciar de erro
+        const toast = document.getElementById('toast-erro');
+        toast.classList.replace('bg-red-600', 'bg-amber-500');
+    }
+});
+
         const sessaoSalva = JSON.parse(localStorage.getItem('usuarioLogado'));
         if(sessaoSalva) {
             direcionarUsuario(sessaoSalva);
