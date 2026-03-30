@@ -274,16 +274,21 @@
                         <button onclick="window.abrirPerfil('carrinho')" class="text-blue-500 bg-blue-50 w-12 h-12 rounded-full flex items-center justify-center border border-blue-100 shadow-sm active:scale-90 transition-all"><i class="ph-bold ph-pencil-simple text-xl"></i></button>
                     </div>
                     
-                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <p class="text-[9px] font-black text-slate-400 uppercase mb-3 italic tracking-widest">Forma de Pagamento</p>
-                        <select id="forma-pagamento" onchange="window.validarCheckout()" class="w-full bg-white p-4 rounded-xl text-xs font-bold border border-slate-200 outline-none text-slate-600 appearance-none focus:border-emerald-300 transition-all">
-                            <option value="">Selecione a forma de pagamento...</option>
-                            <option value="PIX">💠 PIX</option>
-                            <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
-                            <option value="Cartão de Débito">💳 Cartão de Débito</option>
-                            <option value="Dinheiro">💵 Dinheiro</option>
-                        </select>
-                    </div>
+<div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm">
+    <p class="text-[9px] font-black text-slate-400 uppercase mb-3 italic tracking-widest">Forma de Pagamento</p>
+    <select id="forma-pagamento" onchange="window.mostrarTroco(); window.validarCheckout();" class="w-full bg-white p-4 rounded-xl text-xs font-bold border border-slate-200 outline-none text-slate-600 appearance-none focus:border-emerald-300 transition-all">
+        <option value="">Selecione a forma de pagamento...</option>
+        <option value="PIX">💠 PIX</option>
+        <option value="Cartão de Crédito">💳 Cartão de Crédito</option>
+        <option value="Cartão de Débito">💳 Cartão de Débito</option>
+        <option value="Dinheiro">💵 Dinheiro</option>
+    </select>
+
+    <div id="wrapper-troco" class="hidden mt-4 pt-4 border-t border-slate-200 animate-pop">
+        <p class="text-[9px] font-black text-slate-400 uppercase mb-2 italic">Precisa de troco para quanto?</p>
+        <input type="number" id="troco-para" placeholder="Ex: 50.00" class="w-full bg-white p-3 rounded-xl text-xs font-bold border border-slate-200 outline-none focus:border-orange-300">
+    </div>
+</div>
 
                     <div class="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col gap-2 shadow-sm">
                         <div class="flex justify-between items-center">
