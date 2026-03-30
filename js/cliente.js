@@ -742,6 +742,7 @@ window.validarCheckout = function() {
 // MÓDULO 7: ENVIO DO PEDIDO E HISTÓRICO
 // =============================================================
 window.enviarPedido = async function() {
+window.enviarPedido = async function() {
     if (!LOJA_ABERTA) return window.sysAlert("Loja Fechada", "Não aceitamos pedidos no momento.", "erro");
 
     const fp = document.getElementById('forma-pagamento').value;
@@ -756,18 +757,21 @@ window.enviarPedido = async function() {
     const taxa = window.calcularFreteAtual();
     const vtFinalComFrete = vtProdutos + taxa;
 
-    // --- SEGURANÇA: VALIDAÇÃO DE TROCO (PAGAMENTO EM DINHEIRO) ---
+    // --- SEGURANÇA: VALIDAÇÃO DE TROCO COM MÁSCARA ---
     if (fp.toUpperCase() === 'DINHEIRO') {
         // Caso o cliente marcou o checkbox "Não preciso"
         if (checkSemTroco && checkSemTroco.checked) {
             trocoFinal = "NÃO PRECISA";
         } else {
-            // Se não marcou, validamos o valor digitado
-            const valorDigitado = campoTroco ? campoTroco.value.replace(',', '.') : "";
-            const valorTrocoNum = parseFloat(valorDigitado);
+            // Pega o que o cliente digitou na tela (ex: "1.050,00")
+            const valorDigitado = campoTroco ? campoTroco.value : "";
             
-            // Verifica se o campo está vazio ou inválido
-            if (!valorDigitado || isNaN(valorTrocoNum)) {
+            // LIMPEZA DA MÁSCARA: Remove os pontos de milhar e troca a vírgula por ponto
+            const valorLimpo = valorDigitado.replace(/\./g, '').replace(',', '.');
+            const valorTrocoNum = parseFloat(valorLimpo);
+            
+            // Verifica se o campo está vazio, zerado ou inválido
+            if (!valorDigitado || isNaN(valorTrocoNum) || valorTrocoNum === 0) {
                 return window.sysAlert("Atenção", "Para pagamento em dinheiro, informe para quanto precisa de troco ou marque 'Não preciso'.", "erro");
             }
 
@@ -780,7 +784,8 @@ window.enviarPedido = async function() {
                 );
             }
             
-            trocoFinal = valorDigitado;
+            // Salvamos o valor numérico puro (ex: 1050.00) para não quebrar a impressora/monitor
+            trocoFinal = valorTrocoNum.toFixed(2);
         }
     }
     // -------------------------------------------------------------
@@ -795,7 +800,7 @@ window.enviarPedido = async function() {
         taxa_entrega: taxa,
         referencia: (CLIENTE_LOGADO.referencia || CLIENTE_LOGADO.ponto_referencia || "-").toUpperCase(),
         
-        // Salvamos o valor validado aqui (Valor numérico ou "NÃO PRECISA")
+        // Salva o valor validado (Ex: "50.00", "1050.00" ou "NÃO PRECISA")
         troco_para: trocoFinal, 
 
         itens: CARRINHO.map(i => ({ 
