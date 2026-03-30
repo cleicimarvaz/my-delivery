@@ -741,6 +741,9 @@ window.validarCheckout = function() {
 // =============================================================
 // MÓDULO 7: ENVIO DO PEDIDO E HISTÓRICO
 // =============================================================
+// =============================================================
+// MÓDULO 7: ENVIO DO PEDIDO E HISTÓRICO
+// =============================================================
 window.enviarPedido = async function() {
     if (!LOJA_ABERTA) return window.sysAlert("Loja Fechada", "Não aceitamos pedidos no momento.", "erro");
 
@@ -848,7 +851,96 @@ window.enviarPedido = async function() {
         
         window.verificarPedidosAtivos();
     }
-}
+};
+
+window.fecharModalSucesso = function() { 
+    const m = document.getElementById('modal-pedido-sucesso'); 
+    if(m) { m.classList.add('hidden'); m.style.setProperty('display', 'none', 'important'); } 
+};
+
+window.fecharSucessoAbrirHistorico = function() { window.fecharModalSucesso(); window.abrirMeusPedidos(); };
+
+window.abrirMeusPedidos = async function() {
+    window.fecharTodosModais();
+    if (!CLIENTE_LOGADO) return window.abrirPerfil();
+    
+    const m = document.getElementById('modal-pedidos-hist');
+    m.classList.remove('hidden'); m.style.setProperty('display', 'flex', 'important');
+    
+    const c = document.getElementById('lista-meus-pedidos');
+    c.innerHTML = '<div class="py-20 text-center opacity-50"><i class="ph-bold ph-spinner animate-spin text-3xl"></i></div>';
+    
+    const { data } = await _supabase.from('pedidos').select('*').eq('cliente_tel', CLIENTE_LOGADO.telefone).order('created_at', { ascending: false });
+    if (data) { 
+        HISTORICO_PEDIDOS_CLIENTE = data; 
+        window.renderizarListaPedidos(); 
+    } else {
+        c.innerHTML = `<div class="text-center py-20 opacity-40 italic"><p class="text-xs font-black uppercase">Nenhum pedido</p></div>`;
+    }
+};
+
+window.filtrarHistorico = function(tipo) {
+    FILTRO_HISTORICO_ATUAL = tipo;
+    const btnA = document.getElementById('btn-filtro-andamento'), btnF = document.getElementById('btn-filtro-finalizado');
+    if (tipo === 'andamento') {
+        btnA.className = "flex-1 py-2.5 rounded-xl bg-slate-800 text-white text-[10px] font-black uppercase shadow-md transition-all";
+        btnF.className = "flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-[10px] font-black uppercase transition-all";
+    } else {
+        btnF.className = "flex-1 py-2.5 rounded-xl bg-slate-800 text-white text-[10px] font-black uppercase shadow-md transition-all";
+        btnA.className = "flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-[10px] font-black uppercase transition-all";
+    }
+    window.renderizarListaPedidos();
+};
+
+window.renderizarListaPedidos = function() {
+    const container = document.getElementById('lista-meus-pedidos');
+    
+    const pFiltrados = FILTRO_HISTORICO_ATUAL === 'andamento' 
+        ? HISTORICO_PEDIDOS_CLIENTE.filter(p => ['Aguardando PIX', 'Pendente', 'Em Preparo', 'Em Rota'].includes(p.status)) 
+        : HISTORICO_PEDIDOS_CLIENTE.filter(p => ['Entregue', 'Cancelado'].includes(p.status));
+    
+    if (pFiltrados.length === 0) { 
+        container.innerHTML = `<div class="text-center py-20 opacity-40 italic"><p class="text-xs font-black uppercase tracking-widest">Nada por aqui</p></div>`; 
+        return; 
+    }
+    
+    container.innerHTML = pFiltrados.map(pedido => {
+        const pagStr = pedido.forma_pagamento || (pedido.endereco.split('PGTO: ')[1] || '---');
+        const cores = { 
+            'Aguardando PIX': 'bg-yellow-500 text-white',
+            'Pendente': 'bg-slate-800 text-white', 
+            'Em Preparo': 'bg-orange-500 text-white', 
+            'Em Rota': 'bg-blue-500 text-white', 
+            'Entregue': 'bg-emerald-500 text-white', 
+            'Cancelado': 'bg-red-500 text-white' 
+        };
+        
+        return `
+        <div onclick="window.abrirHistoricoPedido(${pedido.id}, '${pedido.status}', '${pedido.created_at}')" class="bg-slate-50 p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4 animate-pop cursor-pointer hover:border-blue-200 group">
+            <div class="flex justify-between items-center">
+                <span class="text-[10px] font-black text-slate-400 uppercase italic">Pedido #${pedido.id}</span>
+                <span class="text-[9px] font-black uppercase px-3 py-1 rounded-full ${cores[pedido.status] || 'bg-slate-400 text-white'}">${pedido.status}</span>
+            </div>
+            <div class="space-y-2">
+                ${pedido.itens.map(i => `<div class="text-[11px] font-bold text-slate-600 leading-snug"><span class="text-slate-800 font-black">${i.qtd}x</span> ${i.nome}</div>`).join('')}
+            </div>
+            <div class="mt-2 pt-3 border-t border-slate-200/60 flex justify-between items-center">
+                <div class="flex flex-col">
+                    <span class="text-[8px] font-black text-slate-400 uppercase">Pagamento</span>
+                    <span class="text-[10px] font-black text-slate-700 uppercase italic">${pagStr}</span>
+                </div>
+                <div class="bg-blue-500 text-white text-[9px] font-black uppercase px-4 py-2 rounded-xl italic flex items-center gap-2 shadow-md group-hover:bg-blue-600 transition-all">
+                    <i class="ph-bold ph-chat-teardrop-text"></i> Acompanhar
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+};
+
+window.fecharMeusPedidos = function() { 
+    const m = document.getElementById('modal-pedidos-hist'); 
+    if(m) { m.classList.add('hidden'); m.style.setProperty('display', 'none', 'important'); } 
+};
 
 window.fecharModalSucesso = function() { 
     const m = document.getElementById('modal-pedido-sucesso'); 
