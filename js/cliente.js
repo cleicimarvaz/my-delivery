@@ -727,35 +727,44 @@ window.enviarPedido = async function() {
 
     const fp = document.getElementById('forma-pagamento').value;
     
-    // --- LÓGICA DE TROCO ATUALIZADA ---
+    // --- ELEMENTOS DE TROCO ---
     const campoTroco = document.getElementById('troco-para');
     const checkSemTroco = document.getElementById('sem-troco');
     let trocoFinal = "";
 
-    // Calculamos os valores primeiro para validar
+    // 1. Calculamos os valores primeiro para realizar a validação
     const vtProdutos = CARRINHO.reduce((acc, i) => acc + (i.precoUnitario * i.qtd), 0);
     const taxa = window.calcularFreteAtual();
     const vtFinalComFrete = vtProdutos + taxa;
 
-    // Se o pagamento for em Dinheiro, validamos o troco
+    // --- SEGURANÇA: VALIDAÇÃO DE TROCO (PAGAMENTO EM DINHEIRO) ---
     if (fp.toUpperCase() === 'DINHEIRO') {
+        // Caso o cliente marcou o checkbox "Não preciso"
         if (checkSemTroco && checkSemTroco.checked) {
             trocoFinal = "NÃO PRECISA";
         } else {
+            // Se não marcou, validamos o valor digitado
             const valorDigitado = campoTroco ? campoTroco.value.replace(',', '.') : "";
+            const valorTrocoNum = parseFloat(valorDigitado);
             
-            if (!valorDigitado || valorDigitado === "") {
-                return window.sysAlert("Atenção", "Por favor, informe para quanto precisa de troco ou marque 'Não preciso'.", "erro");
+            // Verifica se o campo está vazio ou inválido
+            if (!valorDigitado || isNaN(valorTrocoNum)) {
+                return window.sysAlert("Atenção", "Para pagamento em dinheiro, informe para quanto precisa de troco ou marque 'Não preciso'.", "erro");
             }
 
-            if (parseFloat(valorDigitado) < vtFinalComFrete) {
-                return window.sysAlert("Valor Insuficiente", `O valor para troco (R$ ${parseFloat(valorDigitado).toFixed(2)}) não pode ser menor que o total do pedido (R$ ${vtFinalComFrete.toFixed(2)}).`, "erro");
+            // Verifica se o valor oferecido é menor que o total da conta
+            if (valorTrocoNum < vtFinalComFrete) {
+                return window.sysAlert(
+                    "Valor Insuficiente", 
+                    `O valor para troco (R$ ${valorTrocoNum.toFixed(2).replace('.', ',')}) não pode ser menor que o total do pedido (R$ ${vtFinalComFrete.toFixed(2).replace('.', ',')}).`, 
+                    "erro"
+                );
             }
             
             trocoFinal = valorDigitado;
         }
     }
-    // ----------------------------------
+    // -------------------------------------------------------------
 
     const enderecoFormatado = `${CLIENTE_LOGADO.rua}, ${CLIENTE_LOGADO.num} - ${CLIENTE_LOGADO.bairro}, ${CLIENTE_LOGADO.cidade}`.toUpperCase();
 
@@ -767,7 +776,7 @@ window.enviarPedido = async function() {
         taxa_entrega: taxa,
         referencia: (CLIENTE_LOGADO.referencia || CLIENTE_LOGADO.ponto_referencia || "-").toUpperCase(),
         
-        // Salvamos o valor validado aqui
+        // Salvamos o valor validado aqui (Valor numérico ou "NÃO PRECISA")
         troco_para: trocoFinal, 
 
         itens: CARRINHO.map(i => ({ 
@@ -788,7 +797,7 @@ window.enviarPedido = async function() {
 
     if (error) {
         console.error("Erro ao enviar pedido:", error);
-        return window.sysAlert("Erro", "Falha de conexão. Tente novamente.", "erro");
+        return window.sysAlert("Erro", "Falha de conexão ao enviar pedido. Tente novamente.", "erro");
     }
 
     if (data) { 
@@ -801,7 +810,7 @@ window.enviarPedido = async function() {
         if (fp.toUpperCase() === 'PIX') {
             window.abrirModalPix(data.id, vtFinalComFrete);
         } else {
-            // Preenche a tela de sucesso
+            // Preenche os dados do modal de sucesso
             if(document.getElementById('sucesso-pedido-id')) document.getElementById('sucesso-pedido-id').innerText = `Pedido #${data.id}`;
             if(document.getElementById('sucesso-endereco')) document.getElementById('sucesso-endereco').innerText = `${CLIENTE_LOGADO.rua}, ${CLIENTE_LOGADO.num}`;
             if(document.getElementById('sucesso-pgto')) document.getElementById('sucesso-pgto').innerText = fp.toUpperCase();
