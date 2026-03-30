@@ -358,30 +358,33 @@ if (p.forma_pagamento === 'DINHEIRO' && p.troco_para) {
                 </div>
             </div>`).join('');
 
-        let botoesAcaoHtml = '';
-        if (p.status === 'Aguardando PIX') {
-            botoesAcaoHtml = `
-            <div class="grid grid-cols-3 gap-2 mt-2">
-                <button onclick="window.atualizarStatus(${p.id}, 'Pendente')" class="col-span-2 w-full bg-emerald-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all italic">💰 CONFIRMAR PIX</button>
-                <button onclick="window.atualizarStatus(${p.id}, 'Cancelado')" class="col-span-1 w-full bg-red-600/20 text-red-500 border border-red-500/50 py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all">RECUSAR</button>
-            </div>`;
-        } else if (p.status === 'Pendente') {
-            botoesAcaoHtml = `
-            <div class="grid grid-cols-2 gap-3 mt-2">
-                <button onclick="window.abrirPreviaPedido(${p.id})" class="w-full bg-slate-700 text-slate-300 py-3 rounded-xl text-[10px] font-black uppercase shadow-sm">👁️ VER</button>
-                <button onclick="window.atualizarStatus(${p.id}, 'Em Preparo')" class="w-full bg-emerald-600 text-white py-3 rounded-xl text-[10px] font-black uppercase shadow-md">✓ ACEITAR</button>
-            </div>`;
-        } else if (p.status === 'Em Preparo') {
-            botoesAcaoHtml = `
-            <div class="mt-2">
-                <button onclick="window.atualizarStatus(${p.id}, 'Em Rota')" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-2">🛵 ENTREGAR</button>
-            </div>`;
-        } else if (p.status === 'Em Rota') {
-            botoesAcaoHtml = `
-            <div class="mt-2">
-                <button onclick="window.atualizarStatus(${p.id}, 'Entregue')" class="w-full bg-emerald-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-2">✓ FINALIZAR</button>
-            </div>`;
-        }
+let botoesAcaoHtml = '';
+
+if (p.status === 'Aguardando PIX') {
+    botoesAcaoHtml = `
+    <div class="grid grid-cols-3 gap-2 mt-2">
+        <button onclick="window.atualizarStatus(${p.id}, 'Pendente')" class="col-span-2 w-full bg-emerald-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all italic">💰 CONFIRMAR PIX</button>
+        <button onclick="window.atualizarStatus(${p.id}, 'Cancelado')" class="col-span-1 w-full bg-red-600/20 text-red-500 border border-red-500/50 py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all">RECUSAR</button>
+    </div>`;
+} else if (p.status === 'Pendente') {
+    // CORREÇÃO: Adicionado o botão de RECUSAR (Cancelado) no grid
+    botoesAcaoHtml = `
+    <div class="grid grid-cols-3 gap-2 mt-2">
+        <button onclick="window.abrirPreviaPedido(${p.id})" class="w-full bg-slate-700 text-slate-300 py-3 rounded-xl text-[10px] font-black uppercase shadow-sm active:scale-95 transition-all">👁️ VER</button>
+        <button onclick="window.atualizarStatus(${p.id}, 'Cancelado')" class="w-full bg-red-600/20 text-red-500 border border-red-500/50 py-3 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all">RECUSAR</button>
+        <button onclick="window.atualizarStatus(${p.id}, 'Em Preparo')" class="w-full bg-emerald-600 text-white py-3 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all">✓ ACEITAR</button>
+    </div>`;
+} else if (p.status === 'Em Preparo') {
+    botoesAcaoHtml = `
+    <div class="mt-2">
+        <button onclick="window.atualizarStatus(${p.id}, 'Em Rota')" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-2">🛵 ENTREGAR</button>
+    </div>`;
+} else if (p.status === 'Em Rota') {
+    botoesAcaoHtml = `
+    <div class="mt-2">
+        <button onclick="window.atualizarStatus(${p.id}, 'Entregue')" class="w-full bg-emerald-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all flex items-center justify-center gap-2">✓ FINALIZAR</button>
+    </div>`;
+}
 
         return `
             <div class="card-pedido bg-slate-800/50 rounded-[2rem] p-5 shadow-xl border border-slate-700/50 flex flex-col justify-between h-full relative transition-all ${statusClass}">
