@@ -284,9 +284,20 @@
         <option value="Dinheiro">💵 Dinheiro</option>
     </select>
 
-    <div id="wrapper-troco" class="hidden mt-4 pt-4 border-t border-slate-200 animate-pop">
-        <p class="text-[9px] font-black text-slate-400 uppercase mb-2 italic">Precisa de troco para quanto?</p>
-        <input type="number" id="troco-para" placeholder="Ex: 50.00" class="w-full bg-white p-3 rounded-xl text-xs font-bold border border-slate-200 outline-none focus:border-orange-300">
+<div id="wrapper-troco" class="hidden mt-4 pt-4 border-t border-slate-200 animate-pop">
+    <div class="flex items-center justify-between mb-2">
+        <p class="text-[9px] font-black text-slate-400 uppercase mb-1 italic tracking-widest">Precisa de troco para quanto?</p>
+        
+        <label class="flex items-center gap-2 cursor-pointer group">
+            <input type="checkbox" id="sem-troco" onchange="window.toggleInputTroco()" class="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 transition-all">
+            <span class="text-[9px] font-black text-slate-400 uppercase group-hover:text-slate-600 transition-colors">Não preciso</span>
+        </label>
+    </div>
+
+    <div class="relative">
+        <span id="cifrao-troco" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">R$</span>
+        <input type="number" id="troco-para" step="0.01" placeholder="0,00" 
+               class="w-full bg-white p-4 pl-10 rounded-2xl text-xs font-bold border border-slate-200 outline-none focus:border-orange-300 transition-all placeholder:text-slate-300">
     </div>
 </div>
 
