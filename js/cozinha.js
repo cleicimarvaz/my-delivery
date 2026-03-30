@@ -310,9 +310,25 @@ window.renderizarMonitor = function() {
         }
 
         // --- NOVO: BLOCO DE TROCO NO MONITOR ---
-        let htmlTrocoMonitor = '';
-        if (p.troco_para && p.troco_para.trim() !== "" && p.forma_pagamento === 'DINHEIRO') {
-            const valorTrocoCalculado = parseFloat(p.troco_para.replace(',', '.')) - parseFloat(p.total);
+      let htmlTrocoMonitor = '';
+
+// Verificamos se o pagamento é em dinheiro e se há algo escrito no campo troco
+if (p.forma_pagamento === 'DINHEIRO' && p.troco_para) {
+    
+    if (p.troco_para === "NÃO PRECISA") {
+        // CASO 1: Cliente marcou que não precisa de troco
+        htmlTrocoMonitor = `
+            <div class="mt-2 mb-3 p-3 bg-slate-500/10 border border-slate-500/30 rounded-2xl animate-pop">
+                <p class="text-[9px] font-black text-slate-400 uppercase italic tracking-widest flex items-center gap-1">
+                    💵 DINHEIRO (SEM TROCO)
+                </p>
+            </div>`;
+    } else {
+        // CASO 2: Cliente digitou um valor para troco
+        const valorTrocoCalculado = parseFloat(p.troco_para.replace(',', '.')) - parseFloat(p.total);
+        
+        // Só exibe se o cálculo for um número válido (segurança extra)
+        if (!isNaN(valorTrocoCalculado)) {
             htmlTrocoMonitor = `
                 <div class="mt-2 mb-3 p-3 bg-orange-500/10 border border-orange-500/40 rounded-2xl animate-pop">
                     <p class="text-[9px] font-black text-orange-400 uppercase italic tracking-widest mb-1">💵 LEVAR TROCO</p>
@@ -322,6 +338,8 @@ window.renderizarMonitor = function() {
                     </div>
                 </div>`;
         }
+    }
+}
 
         let badgeColor = '';
         if(p.status === 'Aguardando PIX') badgeColor = 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50';
