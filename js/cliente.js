@@ -39,6 +39,25 @@ window.mascaraTelefone = function(i) {
     i.value = v;
 }
 
+window.mascaraMoeda = function(campo) {
+    // Remove tudo que não for número
+    let valor = campo.value.replace(/\D/g, ''); 
+    
+    // Se apagar tudo, deixa vazio
+    if (valor === '') {
+        campo.value = '';
+        return;
+    }
+    
+    // Converte para número, divide por 100 e formata para o padrão Brasileiro (ex: 5000 vira 50,00)
+    valor = (parseInt(valor, 10) / 100).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+    
+    campo.value = valor;
+};
+
 window.fecharAlerta = function() {
     const modal = document.getElementById('modal-alerta');
     if(modal) { 
